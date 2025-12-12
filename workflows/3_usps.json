@@ -95,81 +95,75 @@
         "assignments": {
           "assignments": [
             {
-              "id": "3bb5f00e-319f-45d8-90da-fd370bacab52",
-              "name": "firm",
-              "value": "",
-              "type": "string"
-            },
-            {
               "id": "71f4b6f7-1424-421c-ae04-88b20de51c89",
               "name": "firstName",
-              "value": "={{ $json.body.Name.split(' ')[0] }}",
+              "value": "={{ $json.Name.split(' ')[0] }}",
               "type": "string"
             },
             {
               "id": "d48eb762-c2f1-4750-b97e-91f8d4d8d374",
               "name": "lastName",
-              "value": "={{ $json.body.Name.split(' ').slice(1).join(' ') }}",
+              "value": "={{ $json.Name.split(' ').slice(1).join(' ') }}",
               "type": "string"
             },
             {
               "id": "946dc007-ae2a-4b97-aef7-a9475a87475a",
               "name": "streetAddress",
-              "value": "={{ $json.body.Address1 }}",
+              "value": "={{ $json.Address1 }}",
               "type": "string"
             },
             {
               "id": "0f62ed00-0ab9-4eec-b495-4992e78376c0",
               "name": "secondaryAddress",
-              "value": "={{ $json.body.Address2 }}",
+              "value": "={{ $json.Address2 }}",
               "type": "string"
             },
             {
               "id": "c3c68b34-54d6-4b64-bd4c-2abf156113f5",
               "name": "city",
-              "value": "={{ $json.body.City }}",
+              "value": "={{ $json.City }}",
               "type": "string"
             },
             {
               "id": "b4a86044-ceae-4ff9-95d2-f33bfe1b21d3",
               "name": "state",
-              "value": "={{ $json.body.State }}",
+              "value": "={{ $json.State }}",
               "type": "string"
             },
             {
               "id": "7a72f09c-f2df-4005-bff7-64a7ded3488c",
               "name": "ZIPCode",
-              "value": "={{ $json.body.ZipCode.split('-')[0] }}",
+              "value": "={{ $json.ZipCode.split('-')[0] }}",
               "type": "string"
             },
             {
               "id": "02e0196f-f4ca-49ce-8cb7-908eaf8429e3",
               "name": "ZIPPlus4",
-              "value": "={{ ($json.body.ZipCode.split('-')[1] || '') }}",
+              "value": "={{ ($json.ZipCode.split('-')[1] || '') }}",
               "type": "string"
             },
             {
               "id": "babfcd4d-39b7-4224-bb89-ed80260424fa",
               "name": "Length",
-              "value": "={{ $json.body.Length || 11 }}",
+              "value": "={{ $json.Length || 11 }}",
               "type": "number"
             },
             {
               "id": "68125d72-7ec6-473d-b803-5398973f4038",
               "name": "Width",
-              "value": "={{ $json.body.Width || 7 }}",
+              "value": "={{ $json.Width || 7 }}",
               "type": "number"
             },
             {
               "id": "7bc04696-f84b-4fd0-836c-01ecccb30334",
               "name": "Height",
-              "value": "={{ $json.body.Height || 9 }}",
+              "value": "={{ $json.Height || 9 }}",
               "type": "number"
             },
             {
               "id": "f4476d15-a66f-4aa0-b575-0bb95a80fab5",
               "name": "Weight",
-              "value": "={{ $json.body.Weight || 14 }}",
+              "value": "={{ $json.Weight || 14 }}",
               "type": "number"
             },
             {
@@ -193,31 +187,31 @@
             {
               "id": "5d2c415d-a4f4-47df-99c3-bce9e9b95f62",
               "name": "Company",
-              "value": "={{ $json.body.Company || 'Welpak' }}",
+              "value": "={{ $json.Company || 'Welpak' }}",
               "type": "string"
             },
             {
               "id": "2aad2b41-8dd1-4d6b-8c82-0345de8554e4",
               "name": "Phone",
-              "value": "={{\n (function() {\n \n // --- Helper Function for Cleaning Phone Numbers ---\n function cleanPhoneNumber(phoneNumber) {\n let cleaned = (phoneNumber || '0000000000').split(/ext|extension|:/i)[0].replace(/\\D/g, '');\n if (cleaned.startsWith('1') && cleaned.length === 11) {\n return cleaned.substring(1);\n }\n return cleaned;\n }\n \n // Call the function with your specific n8n variable and return the result\n return cleanPhoneNumber($json[\"body\"][\"PhoneNumber\"]);\n \n })()\n}}",
+              "value": "={{\n (function() {\n \n // --- Helper Function for Cleaning Phone Numbers ---\n function cleanPhoneNumber(phoneNumber) {\n let cleaned = (phoneNumber || '0000000000').split(/ext|extension|:/i)[0].replace(/\\D/g, '');\n if (cleaned.startsWith('1') && cleaned.length === 11) {\n return cleaned.substring(1);\n }\n return cleaned;\n }\n \n // Call the function with your specific n8n variable and return the result\n return cleanPhoneNumber($json[\"PhoneNumber\"]);\n \n })()\n}}",
               "type": "string"
             },
             {
               "id": "8099cc83-0518-46c1-92af-3e783394bdcd",
               "name": "Email",
-              "value": "={{ $json[\"body\"][\"Email\"] || 'rmartin@welpakco.com'}}",
+              "value": "={{ $json[\"Email\"] || 'rmartin@welpakco.com'}}",
               "type": "string"
             },
             {
               "id": "1cd51eb9-1e6c-4c75-93fd-161589d26bb1",
               "name": "SaleOrder",
-              "value": "={{ $json[\"body\"][\"SaleOrder\"] || '9842354905'}}",
+              "value": "={{ $json[\"SaleOrder\"] || '9842354905'}}",
               "type": "string"
             },
             {
               "id": "ca0e6389-4550-4c21-bc58-8b4b168712ac",
               "name": "ShippingMethod",
-              "value": "={{ $json.body.ShippingMethod }}",
+              "value": "={{ $json.ShippingMethod }}",
               "type": "string"
             }
           ]

@@ -10,7 +10,7 @@
           "cachedResultName": "Chilly Water Rates USPS"
         },
         "workflowInputs": {
-          "mappingMode": "defineBelow",
+          "mappingMode": "passThroughAll",
           "value": {}
         },
         "options": {
@@ -36,7 +36,7 @@
           "cachedResultName": "Chilly Water Rates UPS"
         },
         "workflowInputs": {
-          "mappingMode": "defineBelow",
+          "mappingMode": "passThroughAll",
           "value": {},
           "matchingColumns": [],
           "schema": [],
@@ -277,7 +277,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"toAddress\": {\n    \"firm\": \"{{ $('Validate Address').item.json.firm || '' }}\",\n    \"firstName\": \"{{ $('Dynamic Params1').item.json['firstName'] }}\",\n    \"lastName\": \"{{ $('Dynamic Params1').item.json['lastName'] }}\",\n    \"streetAddress\": \"{{ $('Validate Address').item.json.address.streetAddress }}\",\n    \"secondaryAddress\": \"{{ $('Validate Address').item.json.address.secondaryAddress || '' }}\",\n    \"city\": \"{{ $('Validate Address').item.json.address.city }}\",\n    \"state\": \"{{ $('Validate Address').item.json.address.state }}\",\n    \"ZIPCode\": \"{{ $('Validate Address').item.json.address.ZIPCode }}\",\n    \"ZIPPlus4\": \"{{ $('Validate Address').item.json.address.ZIPPlus4 || '0000' }}\"\n  },\n  \"fromAddress\": {\n    \"firm\": \"{{ $('Dynamic Params1').item.json['Company'] }}\",\n    \"streetAddress\": \"101 INDUSTRIAL DR\",\n    \"secondaryAddress\": \"STE 100\",\n    \"city\": \"LOUISBURG\",\n    \"state\": \"NC\",\n    \"ZIPCode\": \"27549\",\n    \"ZIPPlus4\": \"2375\"\n  },\n  \"packageDescription\": {\n    \"mailClass\": \"{{ $('Best Rates USPS & UPS').item.json.bestUSPSRate.rateOption.rates[0].mailClass }}\",\n    \"weightUOM\": \"{{ $('Dynamic Params1').item.json['WeightUOM'] }}\",\n    \"weight\": {{ $('Dynamic Params1').item.json['Weight'] }},\n    \"dimensionsUOM\": \"{{ $('Dynamic Params1').item.json['DimensionsUOM'] }}\",\n    \"length\": {{ $('Best Rates USPS & UPS').item.json.flatRateBox ? $('Best Rates USPS & UPS').item.json.flatRateBox.dimensions.split(' x ')[0].replace(/[^0-9.]/g, '') : $('Dynamic Params1').item.json['Length'] }},\n    \"height\": {{ $('Best Rates USPS & UPS').item.json.flatRateBox ? $('Best Rates USPS & UPS').item.json.flatRateBox.dimensions.split(' x ')[1].replace(/[^0-9.]/g, '') : $('Dynamic Params1').item.json['Height'] }},\n    \"width\": {{ $('Best Rates USPS & UPS').item.json.flatRateBox ? $('Best Rates USPS & UPS').item.json.flatRateBox.dimensions.split(' x ')[2]?.replace(/[^0-9.]/g, '') || 1 : $('Dynamic Params1').item.json['Width'] }},\n    \"processingCategory\": \"{{ $('Best Rates USPS & UPS').item.json.bestUSPSRate.rateOption.rates[0].processingCategory || 'NONSTANDARD' }}\",\n    \"mailingDate\": \"{{ $now.toFormat('yyyy-MM-dd') }}\",\n    \"destinationEntryFacilityType\": \"NONE\",\n    {{\n      (() => {\n        const r = $('Best Rates USPS & UPS').item.json?.bestUSPSRate?.rateOption?.rates?.[0];\n        return (r?.rateIndicator)\n          ? `\"productName\": \"${r.productName}\", \"rateIndicator\": \"${r.rateIndicator}\"`\n          : `\"packagingType\": \"VARIABLE\", \"shape\": \"RECTANGULAR\"`;\n      })()\n    }},\n    \"note\": \"{{ $('Best Rates USPS & UPS').item.json.flatRateBox ? 'Use: ' + $('Best Rates USPS & UPS').item.json.flatRateBox.name + ' (' + $('Best Rates USPS & UPS').item.json.flatRateBox.dimensions + ')' : '' }}\"\n  },\n  \"imageInfo\": {\n    \"imageType\": \"PDF\",\n    \"labelType\": \"4X6LABEL\",\n    \"receiptOption\": \"NONE\"\n  }\n}\n",
+        "jsonBody": "={\n  \"toAddress\": {\n    \"firm\": \"{{ $('Validate Address').item.json.firm || '' }}\",\n    \"firstName\": \"{{ $item(0).$node['Dynamic Params1'].json['firstName'] }}\",\n    \"lastName\": \"{{ $item(0).$node['Dynamic Params1'].json['lastName'] }}\",\n    \"streetAddress\": \"{{ $('Validate Address').item.json.address.streetAddress }}\",\n    \"secondaryAddress\": \"{{ $('Validate Address').item.json.address.secondaryAddress || '' }}\",\n    \"city\": \"{{ $('Validate Address').item.json.address.city }}\",\n    \"state\": \"{{ $('Validate Address').item.json.address.state }}\",\n    \"ZIPCode\": \"{{ $('Validate Address').item.json.address.ZIPCode }}\",\n    \"ZIPPlus4\": \"{{ $('Validate Address').item.json.address.ZIPPlus4 || '0000' }}\"\n  },\n  \"fromAddress\": {\n    \"firm\": \"{{ $item(0).$node['Dynamic Params1'].json['Company'] }}\",\n    \"streetAddress\": \"101 INDUSTRIAL DR\",\n    \"secondaryAddress\": \"STE 100\",\n    \"city\": \"LOUISBURG\",\n    \"state\": \"NC\",\n    \"ZIPCode\": \"27549\",\n    \"ZIPPlus4\": \"2375\"\n  },\n  \"packageDescription\": {\n    \"mailClass\": \"{{ $('Best Rates USPS & UPS').item.json.bestUSPSRate.rateOption.rates[0].mailClass }}\",\n    \"weightUOM\": \"{{ $item(0).$node['Dynamic Params1'].json['WeightUOM'] }}\",\n    \"weight\": {{ $item(0).$node['Dynamic Params1'].json['Weight'] }},\n    \"dimensionsUOM\": \"{{ $item(0).$node['Dynamic Params1'].json['DimensionsUOM'] }}\",\n    \"length\": {{ $('Best Rates USPS & UPS').item.json.flatRateBox ? $('Best Rates USPS & UPS').item.json.flatRateBox.dimensions.split(' x ')[0].replace(/[^0-9.]/g, '') : $item(0).$node['Dynamic Params1'].json['Length'] }},\n    \"height\": {{ $('Best Rates USPS & UPS').item.json.flatRateBox ? $('Best Rates USPS & UPS').item.json.flatRateBox.dimensions.split(' x ')[1].replace(/[^0-9.]/g, '') : $item(0).$node['Dynamic Params1'].json['Height'] }},\n    \"width\": {{ $('Best Rates USPS & UPS').item.json.flatRateBox ? $('Best Rates USPS & UPS').item.json.flatRateBox.dimensions.split(' x ')[2]?.replace(/[^0-9.]/g, '') || 1 : $item(0).$node['Dynamic Params1'].json['Width'] }},\n    \"processingCategory\": \"{{ $('Best Rates USPS & UPS').item.json.bestUSPSRate.rateOption.rates[0].processingCategory || 'NONSTANDARD' }}\",\n    \"mailingDate\": \"{{ $now.toFormat('yyyy-MM-dd') }}\",\n    \"destinationEntryFacilityType\": \"NONE\",\n    {{\n      (() => {\n        const r = $('Best Rates USPS & UPS').item.json?.bestUSPSRate?.rateOption?.rates?.[0];\n        return (r?.rateIndicator)\n          ? `\"productName\": \"${r.productName}\", \"rateIndicator\": \"${r.rateIndicator}\"`\n          : `\"packagingType\": \"VARIABLE\", \"shape\": \"RECTANGULAR\"`;\n      })()\n    }},\n    \"note\": \"{{ $('Best Rates USPS & UPS').item.json.flatRateBox ? 'Use: ' + $('Best Rates USPS & UPS').item.json.flatRateBox.name + ' (' + $('Best Rates USPS & UPS').item.json.flatRateBox.dimensions + ')' : '' }}\"\n  },\n  \"imageInfo\": {\n    \"imageType\": \"PDF\",\n    \"labelType\": \"4X6LABEL\",\n    \"receiptOption\": \"NONE\"\n  }\n}\n",
         "options": {}
       },
       "type": "n8n-nodes-base.httpRequest",
@@ -299,27 +299,27 @@
           "parameters": [
             {
               "name": "streetAddress",
-              "value": "={{ $('Dynamic Params1').item.json[\"streetAddress\"] }}"
+              "value": "={{ $item(\"0\").$node[\"Dynamic Params1\"].json[\"streetAddress\"] }}"
             },
             {
               "name": "secondaryAddress",
-              "value": "={{ $('Dynamic Params1').item.json[\"secondaryAddress\"] }}"
+              "value": "={{ $item(\"0\").$node[\"Dynamic Params1\"].json[\"secondaryAddress\"] }}"
             },
             {
               "name": "city",
-              "value": "={{ $('Dynamic Params1').item.json[\"city\"] }}"
+              "value": "={{ $item(\"0\").$node[\"Dynamic Params1\"].json[\"city\"] }}"
             },
             {
               "name": "state",
-              "value": "={{ $('Dynamic Params1').item.json[\"state\"] }}"
+              "value": "={{ $item(\"0\").$node[\"Dynamic Params1\"].json[\"state\"] }}"
             },
             {
               "name": "ZIPCode",
-              "value": "={{ $('Dynamic Params1').item.json[\"ZIPCode\"] }}"
+              "value": "={{ $item(\"0\").$node[\"Dynamic Params1\"].json[\"ZIPCode\"] }}"
             },
             {
               "name": "ZIPPlus4",
-              "value": "={{ $('Dynamic Params1').item.json[\"ZIPPlus4\"] || '0000' }}"
+              "value": "={{ $item(\"0\").$node[\"Dynamic Params1\"].json[\"ZIPPlus4\"] || '0000' }}"
             }
           ]
         },
@@ -669,7 +669,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"toAddress\": {\n    \"firm\": \"{{ $('Validate Address').item.json.firm || \"\" }}\",\n    \"firstName\": \"{{ $('Dynamic Params1').item.json[\"firstName\"] }}\",\n    \"lastName\": \"{{ $('Dynamic Params1').item.json[\"lastName\"] }}\",\n    \"streetAddress\": \"{{ $('Validate Address').item.json.address.streetAddress }}\",\n    \"secondaryAddress\": \"{{ $('Validate Address').item.json.address.secondaryAddress || \"\" }}\",\n    \"city\": \"{{ $('Validate Address').item.json.address.city }}\",\n    \"state\": \"{{ $('Validate Address').item.json.address.state }}\",\n    \"ZIPCode\": \"{{ $('Validate Address').item.json.address.ZIPCode }}\",\n    \"ZIPPlus4\": \"{{ $('Validate Address').item.json.address.ZIPPlus4 || '0000' }}\"\n  },\n  \"fromAddress\": {\n    \"firm\": \"{{ $('Dynamic Params1').item.json[\"Company\"] }}\",\n    \"streetAddress\": \"101 INDUSTRIAL DR\",\n    \"secondaryAddress\": \"STE 100\",\n    \"city\": \"LOUISBURG\",\n    \"state\": \"NC\",\n    \"ZIPCode\": \"27549\",\n    \"ZIPPlus4\": \"2375\"\n  },\n  \"packageDescription\": {\n    \"mailClass\": \"{{ $('Best Rates USPS & UPS').item.json.bestUSPSRate.rateOption.rates[0].mailClass }}\",\n    \"weightUOM\": \"{{ $('Dynamic Params1').item.json['WeightUOM'] }}\",\n    \"weight\": {{ $('Dynamic Params1').item.json['Weight'] }},\n    \"dimensionsUOM\": \"{{ $('Dynamic Params1').item.json['DimensionsUOM'] }}\",\n    \"length\": {{ $('Best Rates USPS & UPS').item.json.flatRateBox ? $('Best Rates USPS & UPS').item.json.flatRateBox.dimensions.split(' x ')[0].replace(/[^0-9.]/g, '') : $('Dynamic Params1').item.json['Length'] }},\n    \"height\": {{ $('Best Rates USPS & UPS').item.json.flatRateBox ? $('Best Rates USPS & UPS').item.json.flatRateBox.dimensions.split(' x ')[1].replace(/[^0-9.]/g, '') : $('Dynamic Params1').item.json['Height'] }},\n    \"width\": {{ $('Best Rates USPS & UPS').item.json.flatRateBox ? $('Best Rates USPS & UPS').item.json.flatRateBox.dimensions.split(' x ')[2]?.replace(/[^0-9.]/g, '') || 1 : $('Dynamic Params1').item.json['Width'] }},\n    \"processingCategory\": \"{{ $('Best Rates USPS & UPS').item.json.bestUSPSRate.rateOption.rates[0].processingCategory || 'NONSTANDARD' }}\",\n    \"mailingDate\": \"{{ $now.toFormat('yyyy-MM-dd') }}\",\n    \"destinationEntryFacilityType\": \"NONE\",\n    {{\n      (() => {\n        const r = $('Best Rates USPS & UPS').item.json?.bestUSPSRate?.rateOption?.rates?.[0];\n        return (r?.rateIndicator)\n          ? `\"productName\": \"${r.productName}\", \"rateIndicator\": \"${r.rateIndicator}\"`\n          : `\"packagingType\": \"VARIABLE\", \"shape\": \"RECTANGULAR\"`;\n      })()\n    }},\n    \"note\": \"{{ $('Best Rates USPS & UPS').item.json.flatRateBox ? 'Use: ' + $('Best Rates USPS & UPS').item.json.flatRateBox.name + ' (' + $('Best Rates USPS & UPS').item.json.flatRateBox.dimensions + ')' : '' }}\"\n  },\n  \"imageInfo\": {\n    \"imageType\": \"PDF\",\n    \"labelType\": \"4X6LABEL\",\n    \"receiptOption\": \"NONE\"\n  }\n}\n",
+        "jsonBody": "={\n  \"toAddress\": {\n    \"firm\": \"{{ $('Validate Address').item.json.firm || \"\" }}\",\n    \"firstName\": \"{{ $item(\"0\").$node[\"Dynamic Params1\"].json[\"firstName\"] }}\",\n    \"lastName\": \"{{ $item(\"0\").$node[\"Dynamic Params1\"].json[\"lastName\"] }}\",\n    \"streetAddress\": \"{{ $('Validate Address').item.json.address.streetAddress }}\",\n    \"secondaryAddress\": \"{{ $('Validate Address').item.json.address.secondaryAddress || \"\" }}\",\n    \"city\": \"{{ $('Validate Address').item.json.address.city }}\",\n    \"state\": \"{{ $('Validate Address').item.json.address.state }}\",\n    \"ZIPCode\": \"{{ $('Validate Address').item.json.address.ZIPCode }}\",\n    \"ZIPPlus4\": \"{{ $('Validate Address').item.json.address.ZIPPlus4 || '0000' }}\"\n  },\n  \"fromAddress\": {\n    \"firm\": \"{{ $item(\"0\").$node[\"Dynamic Params1\"].json[\"Company\"] }}\",\n    \"streetAddress\": \"101 INDUSTRIAL DR\",\n    \"secondaryAddress\": \"STE 100\",\n    \"city\": \"LOUISBURG\",\n    \"state\": \"NC\",\n    \"ZIPCode\": \"27549\",\n    \"ZIPPlus4\": \"2375\"\n  },\n  \"packageDescription\": {\n    \"mailClass\": \"{{ $('Best Rates USPS & UPS').item.json.bestUSPSRate.rateOption.rates[0].mailClass }}\",\n    \"weightUOM\": \"{{ $item(0).$node['Dynamic Params1'].json['WeightUOM'] }}\",\n    \"weight\": {{ $item(0).$node['Dynamic Params1'].json['Weight'] }},\n    \"dimensionsUOM\": \"{{ $item(0).$node['Dynamic Params1'].json['DimensionsUOM'] }}\",\n    \"length\": {{ $('Best Rates USPS & UPS').item.json.flatRateBox ? $('Best Rates USPS & UPS').item.json.flatRateBox.dimensions.split(' x ')[0].replace(/[^0-9.]/g, '') : $item(0).$node['Dynamic Params1'].json['Length'] }},\n    \"height\": {{ $('Best Rates USPS & UPS').item.json.flatRateBox ? $('Best Rates USPS & UPS').item.json.flatRateBox.dimensions.split(' x ')[1].replace(/[^0-9.]/g, '') : $item(0).$node['Dynamic Params1'].json['Height'] }},\n    \"width\": {{ $('Best Rates USPS & UPS').item.json.flatRateBox ? $('Best Rates USPS & UPS').item.json.flatRateBox.dimensions.split(' x ')[2]?.replace(/[^0-9.]/g, '') || 1 : $item(0).$node['Dynamic Params1'].json['Width'] }},\n    \"processingCategory\": \"{{ $('Best Rates USPS & UPS').item.json.bestUSPSRate.rateOption.rates[0].processingCategory || 'NONSTANDARD' }}\",\n    \"mailingDate\": \"{{ $now.toFormat('yyyy-MM-dd') }}\",\n    \"destinationEntryFacilityType\": \"NONE\",\n    {{\n      (() => {\n        const r = $('Best Rates USPS & UPS').item.json?.bestUSPSRate?.rateOption?.rates?.[0];\n        return (r?.rateIndicator)\n          ? `\"productName\": \"${r.productName}\", \"rateIndicator\": \"${r.rateIndicator}\"`\n          : `\"packagingType\": \"VARIABLE\", \"shape\": \"RECTANGULAR\"`;\n      })()\n    }},\n    \"note\": \"{{ $('Best Rates USPS & UPS').item.json.flatRateBox ? 'Use: ' + $('Best Rates USPS & UPS').item.json.flatRateBox.name + ' (' + $('Best Rates USPS & UPS').item.json.flatRateBox.dimensions + ')' : '' }}\"\n  },\n  \"imageInfo\": {\n    \"imageType\": \"PDF\",\n    \"labelType\": \"4X6LABEL\",\n    \"receiptOption\": \"NONE\"\n  }\n}\n",
         "options": {}
       },
       "type": "n8n-nodes-base.httpRequest",
@@ -737,7 +737,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{\n  (function() {\n  \n    // --- Get Data From Previous Nodes ---\n    const dynamicParams = $('Dynamic Params1').item.json;\n    \n    // --- Conditionally Set the ShipTo Address ---\n    let shipToAddress = {};\n    const candidateData = $('Validate Address1').item.json.body.XAVResponse.Candidate;\n  \n    if (candidateData) {\n      // If validated data exists, use it\n      const validatedAddress = Array.isArray(candidateData) ? candidateData[0].AddressKeyFormat : candidateData.AddressKeyFormat;\n      shipToAddress = {\n        AddressLine: validatedAddress.AddressLine + \" \" + $('Dynamic Params1').item.json.secondaryAddress,\n        City: validatedAddress.PoliticalDivision2,\n        StateProvinceCode: validatedAddress.PoliticalDivision1,\n        PostalCode: validatedAddress.PostcodePrimaryLow,\n        CountryCode: \"US\"\n      };\n    } else {\n      // Otherwise, fallback to the original dynamic parameters\n      shipToAddress = {\n        AddressLine: [dynamicParams.streetAddress] + \" \" + [dynamicParams.secondaryAddress], // AddressLine must be an array\n        City: dynamicParams.city,\n        StateProvinceCode: dynamicParams.state,\n        PostalCode: dynamicParams.ZIPCode,\n        CountryCode: \"US\"\n      };\n    }\n  \n    // --- Build the Final Request Body ---\n    const shipmentRequest = {\n      \"ShipmentRequest\": {\n        \"Request\": {\n          \"SubVersion\": \"1801\",\n          \"RequestOption\": \"nonvalidate\",\n          \"TransactionReference\": {\n            \"CustomerContext\": \"n8n_shipment_test\",\n            \"TransactionIdentifier\": $executionId\n          }\n        },\n        \"Shipment\": {\n          \"Description\": \"Welpak Co Shipment\",\n          \"Shipper\": {\n            \"Name\": \"Welpak\",\n            \"AttentionName\": \"Customer Service\",\n            \"Phone\": { \"Number\": \"9842354905\" },\n            \"ShipperNumber\": $('Best Rates USPS & UPS').item.json.account,\n            \"Address\": {\n              \"AddressLine\": [\"101 INDUSTRIAL DR\", \"STE 100\"],\n              \"City\": \"Louisburg\",\n              \"StateProvinceCode\": \"NC\",\n              \"PostalCode\": \"27549\",\n              \"CountryCode\": \"US\"\n            }\n          },\n          \"ShipTo\": {\n            \"Name\": dynamicParams.firstName + \" \" + dynamicParams.lastName || \"\",\n            \"AttentionName\": dynamicParams.firstName + ' ' + dynamicParams.lastName,\n            \"Phone\": { \"Number\": \"1234567890\" },\n            \"Address\": shipToAddress,\n            \"Residential\": \"\"\n          },\n          \"ShipFrom\": {\n            \"Name\": \"Welpak\",\n            \"AttentionName\": \"Customer Service\",\n            \"Phone\": { \"Number\": \"9842354905\" },\n            \"Address\": {\n              \"AddressLine\": [\"101 INDUSTRIAL DR\", \"STE 100\"],\n              \"City\": \"Louisburg\",\n              \"StateProvinceCode\": \"NC\",\n              \"PostalCode\": \"27549\",\n              \"CountryCode\": \"US\"\n            }\n          },\n          \"PaymentInformation\": {\n            \"ShipmentCharge\": {\n              \"Type\": \"01\",\n              \"BillShipper\": {\n                \"AccountNumber\": $('Best Rates USPS & UPS').item.json.account\n              }\n            }\n          },\n          \"Service\": {\n            \"Code\": $('Best Rates USPS & UPS').item.json.serviceCode,\n            \"Description\": $('Best Rates USPS & UPS').item.json.serviceName\n          },\n          \"Package\": [{\n            \"Description\": \"Package\",\n            \"Packaging\": { \"Code\": \"02\" },\n            \"Dimensions\": {\n              \"UnitOfMeasurement\": { \"Code\": \"IN\" },\n              \"Length\": dynamicParams.Length.toString(),\n              \"Width\": dynamicParams.Width.toString(),\n              \"Height\": dynamicParams.Height.toString()\n            },\n            \"PackageWeight\": {\n              \"UnitOfMeasurement\": { \"Code\": \"LBS\" },\n              \"Weight\": Math.max(1, parseFloat(dynamicParams.Weight)).toString()\n            }\n          }],\n          \"ShipmentRatingOptions\": {\n            \"NegotiatedRatesIndicator\": \"\"\n          }\n        },\n        \"LabelSpecification\": {\n          \"LabelImageFormat\": {\n            \"Code\": \"GIF\"\n          },\n          \"LabelStockSize\": {\n            \"Height\": \"6\",\n            \"Width\": \"4\"\n          }\n        }\n      }\n    };\n  \n    return shipmentRequest;\n  \n  })()\n}}",
+        "jsonBody": "={{\n  (function() {\n  \n    // --- Get Data From Previous Nodes ---\n    const dynamicParams = $node[\"Dynamic Params1\"].json;\n    \n    // --- Conditionally Set the ShipTo Address ---\n    let shipToAddress = {};\n    const candidateData = $('Validate Address1').item.json.body.XAVResponse.Candidate;\n  \n    if (candidateData) {\n      // If validated data exists, use it\n      const validatedAddress = Array.isArray(candidateData) ? candidateData[0].AddressKeyFormat : candidateData.AddressKeyFormat;\n      shipToAddress = {\n        AddressLine: validatedAddress.AddressLine + \" \" + $('Dynamic Params1').item.json.secondaryAddress,\n        City: validatedAddress.PoliticalDivision2,\n        StateProvinceCode: validatedAddress.PoliticalDivision1,\n        PostalCode: validatedAddress.PostcodePrimaryLow,\n        CountryCode: \"US\"\n      };\n    } else {\n      // Otherwise, fallback to the original dynamic parameters\n      shipToAddress = {\n        AddressLine: [dynamicParams.streetAddress] + \" \" + [dynamicParams.secondaryAddress], // AddressLine must be an array\n        City: dynamicParams.city,\n        StateProvinceCode: dynamicParams.state,\n        PostalCode: dynamicParams.ZIPCode,\n        CountryCode: \"US\"\n      };\n    }\n  \n    // --- Build the Final Request Body ---\n    const shipmentRequest = {\n      \"ShipmentRequest\": {\n        \"Request\": {\n          \"SubVersion\": \"1801\",\n          \"RequestOption\": \"nonvalidate\",\n          \"TransactionReference\": {\n            \"CustomerContext\": \"n8n_shipment_test\",\n            \"TransactionIdentifier\": $executionId\n          }\n        },\n        \"Shipment\": {\n          \"Description\": \"Welpak Co Shipment\",\n          \"Shipper\": {\n            \"Name\": \"Welpak\",\n            \"AttentionName\": \"Customer Service\",\n            \"Phone\": { \"Number\": \"9842354905\" },\n            \"ShipperNumber\": $('Best Rates USPS & UPS').item.json.account,\n            \"Address\": {\n              \"AddressLine\": [\"101 INDUSTRIAL DR\", \"STE 100\"],\n              \"City\": \"Louisburg\",\n              \"StateProvinceCode\": \"NC\",\n              \"PostalCode\": \"27549\",\n              \"CountryCode\": \"US\"\n            }\n          },\n          \"ShipTo\": {\n            \"Name\": dynamicParams.firstName + \" \" + dynamicParams.lastName || \"\",\n            \"AttentionName\": dynamicParams.firstName + ' ' + dynamicParams.lastName,\n            \"Phone\": { \"Number\": \"1234567890\" },\n            \"Address\": shipToAddress,\n            \"Residential\": \"\"\n          },\n          \"ShipFrom\": {\n            \"Name\": \"Welpak\",\n            \"AttentionName\": \"Customer Service\",\n            \"Phone\": { \"Number\": \"9842354905\" },\n            \"Address\": {\n              \"AddressLine\": [\"101 INDUSTRIAL DR\", \"STE 100\"],\n              \"City\": \"Louisburg\",\n              \"StateProvinceCode\": \"NC\",\n              \"PostalCode\": \"27549\",\n              \"CountryCode\": \"US\"\n            }\n          },\n          \"PaymentInformation\": {\n            \"ShipmentCharge\": {\n              \"Type\": \"01\",\n              \"BillShipper\": {\n                \"AccountNumber\": $('Best Rates USPS & UPS').item.json.account\n              }\n            }\n          },\n          \"Service\": {\n            \"Code\": $('Best Rates USPS & UPS').item.json.serviceCode,\n            \"Description\": $('Best Rates USPS & UPS').item.json.serviceName\n          },\n          \"Package\": [{\n            \"Description\": \"Package\",\n            \"Packaging\": { \"Code\": \"02\" },\n            \"Dimensions\": {\n              \"UnitOfMeasurement\": { \"Code\": \"IN\" },\n              \"Length\": dynamicParams.Length.toString(),\n              \"Width\": dynamicParams.Width.toString(),\n              \"Height\": dynamicParams.Height.toString()\n            },\n            \"PackageWeight\": {\n              \"UnitOfMeasurement\": { \"Code\": \"LBS\" },\n              \"Weight\": Math.max(1, parseFloat(dynamicParams.Weight)).toString()\n            }\n          }],\n          \"ShipmentRatingOptions\": {\n            \"NegotiatedRatesIndicator\": \"\"\n          }\n        },\n        \"LabelSpecification\": {\n          \"LabelImageFormat\": {\n            \"Code\": \"GIF\"\n          },\n          \"LabelStockSize\": {\n            \"Height\": \"6\",\n            \"Width\": \"4\"\n          }\n        }\n      }\n    };\n  \n    return shipmentRequest;\n  \n  })()\n}}",
         "options": {}
       },
       "id": "dfbcbe91-adf8-4467-938f-365678abb68d",
@@ -780,7 +780,7 @@
             {
               "id": "37e7b96d-cb11-4381-8aa9-56b1530ff0c2",
               "name": "postage",
-              "value": "={{\n  (function() {\n    const negotiatedRate = $('Create Shipment').item.json.ShipmentResponse.ShipmentResults.NegotiatedRateCharges?.TotalCharge.MonetaryValue;\n    \n    if (negotiatedRate && parseFloat(negotiatedRate) > 0) {\n      return negotiatedRate;\n    } else {\n      return $('Create Shipment').item.json.ShipmentResponse.ShipmentResults.ShipmentCharges.TotalCharges.MonetaryValue;\n    }\n  })()\n}}",
+              "value": "={{\n  (function() {\n    const negotiatedRate = $node[\"Create Shipment\"].json.ShipmentResponse.ShipmentResults.NegotiatedRateCharges?.TotalCharge.MonetaryValue;\n    \n    if (negotiatedRate && parseFloat(negotiatedRate) > 0) {\n      return negotiatedRate;\n    } else {\n      return $node[\"Create Shipment\"].json.ShipmentResponse.ShipmentResults.ShipmentCharges.TotalCharges.MonetaryValue;\n    }\n  })()\n}}",
               "type": "number"
             },
             {
@@ -1038,97 +1038,97 @@
             {
               "id": "71f4b6f7-1424-421c-ae04-88b20de51c89",
               "name": "firstName",
-              "value": "={{ $('When Executed by Another Workflow').item.json[\"body\"][\"Name\"].split(' ')[0] }}",
+              "value": "={{ $('When Executed by Another Workflow').item.json[\"Name\"].split(' ')[0] }}",
               "type": "string"
             },
             {
               "id": "d48eb762-c2f1-4750-b97e-91f8d4d8d374",
               "name": "lastName",
-              "value": "={{ $('When Executed by Another Workflow').item.json[\"body\"][\"Name\"].split(' ').slice(1).join(' ') }}",
+              "value": "={{ $('When Executed by Another Workflow').item.json[\"Name\"].split(' ').slice(1).join(' ') }}",
               "type": "string"
             },
             {
               "id": "946dc007-ae2a-4b97-aef7-a9475a87475a",
               "name": "streetAddress",
-              "value": "={{ $('When Executed by Another Workflow').item.json[\"body\"][\"Address1\"] }}",
+              "value": "={{ $('When Executed by Another Workflow').item.json[\"Address1\"] }}",
               "type": "string"
             },
             {
               "id": "0f62ed00-0ab9-4eec-b495-4992e78376c0",
               "name": "secondaryAddress",
-              "value": "={{ $('When Executed by Another Workflow').item.json[\"body\"][\"Address2\"] }}",
+              "value": "={{ $('When Executed by Another Workflow').item.json[\"Address2\"] }}",
               "type": "string"
             },
             {
               "id": "b4a86044-ceae-4ff9-95d2-f33bfe1b21d3",
               "name": "state",
-              "value": "={{ $('When Executed by Another Workflow').item.json[\"body\"][\"State\"] }}",
+              "value": "={{ $('When Executed by Another Workflow').item.json[\"State\"] }}",
               "type": "string"
             },
             {
               "id": "c3c68b34-54d6-4b64-bd4c-2abf156113f5",
               "name": "city",
-              "value": "={{ $('When Executed by Another Workflow').item.json[\"body\"][\"City\"] }}",
+              "value": "={{ $('When Executed by Another Workflow').item.json[\"City\"] }}",
               "type": "string"
             },
             {
               "id": "7a72f09c-f2df-4005-bff7-64a7ded3488c",
               "name": "ZIPCode",
-              "value": "={{ $('When Executed by Another Workflow').item.json[\"body\"][\"ZipCode\"].split('-')[0] }}",
+              "value": "={{ $('When Executed by Another Workflow').item.json[\"ZipCode\"].split('-')[0] }}",
               "type": "string"
             },
             {
               "id": "02e0196f-f4ca-49ce-8cb7-908eaf8429e3",
               "name": "ZIPPlus4",
-              "value": "={{ ($('When Executed by Another Workflow').item.json[\"body\"][\"ZipCode\"].split('-')[1] || '') }}",
+              "value": "={{ ($('When Executed by Another Workflow').item.json[\"ZipCode\"].split('-')[1] || '') }}",
               "type": "string"
             },
             {
               "id": "7cfc31a2-fc73-4f3d-bca7-fd6d5d36b197",
               "name": "CountryCode",
-              "value": "={{ $('When Executed by Another Workflow').item.json[\"body\"][\"CountryCode\"] }}",
+              "value": "={{ $('When Executed by Another Workflow').item.json[\"CountryCode\"] }}",
               "type": "string"
             },
             {
               "id": "5a8a4064-4445-4043-80f2-a9aa6aee8cd5",
               "name": "ShippingMethod",
-              "value": "={{ $('When Executed by Another Workflow').item.json[\"body\"][\"ShippingMethod\"] }}",
+              "value": "={{ $('When Executed by Another Workflow').item.json[\"ShippingMethod\"] }}",
               "type": "string"
             },
             {
               "id": "5d2c415d-a4f4-47df-99c3-bce9e9b95f62",
               "name": "Company",
-              "value": "={{ $('When Executed by Another Workflow').item.json[\"body\"][\"Company\"] }}",
+              "value": "={{ $('When Executed by Another Workflow').item.json[\"Company\"] }}",
               "type": "string"
             },
             {
               "id": "b413068b-b586-4677-8fc7-096bf0c8372e",
               "name": "CompanyLocation",
-              "value": "={{ $('When Executed by Another Workflow').item.json[\"body\"][\"CompanyLocation\"] }}",
+              "value": "={{ $('When Executed by Another Workflow').item.json[\"CompanyLocation\"] }}",
               "type": "string"
             },
             {
               "id": "f4476d15-a66f-4aa0-b575-0bb95a80fab5",
               "name": "Weight",
-              "value": "={{ $('When Executed by Another Workflow').item.json[\"body\"][\"Weight\"] }}",
+              "value": "={{ $('When Executed by Another Workflow').item.json[\"Weight\"] }}",
               "type": "number"
             },
             {
               "id": "babfcd4d-39b7-4224-bb89-ed80260424fa",
               "name": "Length",
-              "value": "={{ $('When Executed by Another Workflow').item.json[\"body\"][\"Length\"] }}",
+              "value": "={{ $('When Executed by Another Workflow').item.json[\"Length\"] }}",
               "type": "number"
             },
             {
               "id": "68125d72-7ec6-473d-b803-5398973f4038",
               "name": "Width",
-              "value": "={{ $('When Executed by Another Workflow').item.json[\"body\"][\"Width\"] }}",
+              "value": "={{ $('When Executed by Another Workflow').item.json[\"Width\"] }}",
               "type": "number"
             },
             {
               "id": "7bc04696-f84b-4fd0-836c-01ecccb30334",
               "name": "Height",
-              "value": "={{ $('When Executed by Another Workflow').item.json[\"body\"][\"Height\"] }}",
+              "value": "={{ $('When Executed by Another Workflow').item.json[\"Height\"] }}",
               "type": "number"
             },
             {
@@ -1146,19 +1146,35 @@
             {
               "id": "2aad2b41-8dd1-4d6b-8c82-0345de8554e4",
               "name": "Phone",
-              "value": "={{\n  (function() {\n  \n      // --- Helper Function for Cleaning Phone Numbers ---\n      function cleanPhoneNumber(phoneNumber) {\n        let cleaned = ($('When Executed by Another Workflow').item.json[\"body\"][\"PhoneNumber\"] || '0000000000').split(/ext|extension|:/i)[0].replace(/\\D/g, '');\n        if (cleaned.startsWith('1') && cleaned.length === 11) {\n          return cleaned.substring(1);\n        }\n        return cleaned;\n      }\n  \n      // Call the function with your specific n8n variable and return the result\n      return cleanPhoneNumber( $('When Executed by Another Workflow').item.json[\"body\"][\"PhoneNumber\"]);\n  \n  })()\n}}",
+              "value": "={{
+  (function() {
+
+      // --- Helper Function for Cleaning Phone Numbers ---
+      function cleanPhoneNumber(phoneNumber) {
+        let cleaned = ($('When Executed by Another Workflow').item.json[\"PhoneNumber\"] || '0000000000').split(/ext|extension|:/i)[0].replace(/\\D/g, '');
+        if (cleaned.startsWith('1') && cleaned.length === 11) {
+          return cleaned.substring(1);
+        }
+        return cleaned;
+      }
+
+      // Call the function with your specific n8n variable and return the result
+      return cleanPhoneNumber( $('When Executed by Another Workflow').item.json[\"PhoneNumber\"]);
+
+  })()
+}}",
               "type": "string"
             },
             {
               "id": "8099cc83-0518-46c1-92af-3e783394bdcd",
               "name": "Email",
-              "value": "={{ $('When Executed by Another Workflow').item.json[\"body\"][\"Email\"] || 'rmartin@welpakco.com'}}",
+              "value": "={{ $('When Executed by Another Workflow').item.json[\"Email\"] || 'rmartin@welpakco.com'}}",
               "type": "string"
             },
             {
               "id": "1cd51eb9-1e6c-4c75-93fd-161589d26bb1",
               "name": "SaleOrder",
-              "value": "={{ $('When Executed by Another Workflow').item.json[\"body\"][\"SaleOrder\"] }}",
+              "value": "={{ $('When Executed by Another Workflow').item.json[\"SaleOrder\"] }}",
               "type": "string"
             },
             {

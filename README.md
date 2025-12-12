@@ -8,11 +8,17 @@ n8n issues
 -   **Fix**: Updated the `jsonBody` to use a proper JavaScript Object Expression `={{ { ... } }}` and verified that it returns a valid structure.
 
 ### 2. Multi-Item / Batch Processing Support ("Huge Payload")
--   **Issue**: Several nodes across the workflows were using inconsistent referencing that could break batch processing (e.g., using `$item("0")` which locks to the first item).
+-   **Issue**: Several nodes across the workflows were using inconsistent referencing (e.g., using `$item("0")`) that could break batch processing. Additionally, the Main workflow was configured to pass empty inputs (`{}`) to sub-workflows via `defineBelow`, causing sub-workflows to receive `undefined` values for critical fields like address and weight.
 -   **Fix**:
-    -   **Main Workflow (`workflows/2_main.json`)**: Replaced instances of `$item("0").$node[...]` with `$('NodeName').item.json...`. This ensures that when multiple items are processed, each execution correctly references its corresponding item from upstream nodes, rather than always using the first item.
-    -   **USPS Workflow (`workflows/3_usps.json`)**: Updated the `Get Best Rate1` (Code Node) to loop through all input items (`$input.all()`) instead of processing only the first one (`$input.first()`), ensuring all rates in a batch are processed.
-    -   **General**: Preserved correct `$('NodeName').item.json` references elsewhere to ensure n8n's Paired Item functionality works as expected.
+    -   **Main Workflow (`workflows/2_main.json`)**:
+        -   Replaced `$item("0").$node[...]` with `$('NodeName').item.json...` to ensure correct paired item referencing.
+        -   Changed `Execute Workflow` nodes to use `mappingMode: "passThroughAll"` to ensure the full item data is passed to sub-workflows.
+        -   Removed incorrect `.body` property access in `Dynamic Params1`, as the input data is flat (from Excel).
+    -   **USPS Workflow (`workflows/3_usps.json`)**:
+        -   Updated `Dynamic Params` to reference properties directly (e.g., `$json.Name` instead of `$json.body.Name`) to match the flat input structure.
+        -   Updated `Get Best Rate1` (Code Node) to loop through all input items (`$input.all()`).
+    -   **UPS Workflow (`workflows/4_ups.json`)**:
+        -   Updated `Dynamic Params1` to reference properties directly (removed `.body`).
 
 ### 3. Workflow Files
 -   The fixed workflows are saved in the `workflows/` directory:
