@@ -1,0 +1,803 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -336,
+        -144
+      ],
+      "id": "d0f5794d-3d75-4b0c-bb01-ac8df1bfb73b",
+      "name": "When Executed by Another Workflow"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "e4f8d975-f852-4467-8c33-b1d1f03403d1",
+              "name": "client_id",
+              "value": "0A1Ls7QRWjDyuJxl0agsOwnvhSyuDYilcZi1fqZZ5KsHzEa3",
+              "type": "string"
+            },
+            {
+              "id": "c62002f2-c2e8-4676-bdc0-388a10731456",
+              "name": "client_secret",
+              "value": "TUAhIebS8nPxs8lyoKysGLXv7qIFkgmTsC6ZbbRnY1GHlAIApCl0xBw7xBASZpvk",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        112,
+        -144
+      ],
+      "id": "86f80196-6f99-4d06-8248-4694b38429d0",
+      "name": "UPS Credentials"
+    },
+    {
+      "parameters": {
+        "jsCode": "// This node combines and Base64-encodes the credentials for the Basic Auth header.\n\nconst clientId = $input.first().json.client_id;\nconst clientSecret = $input.first().json.client_secret;\n\n// Combine credentials in the format 'clientId:clientSecret'\nconst credentials = clientId + ':' + clientSecret;\n\n// Base64 encode the combined string.\nconst encoded = Buffer.from(credentials).toString('base64');\n\n// Return the result for the next node to use.\nreturn [{ \n  json: { \n    encoded_credentials: encoded \n  } \n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        336,
+        -144
+      ],
+      "id": "3677365b-844b-4106-b503-d81c471343c3",
+      "name": "Encode Credentials"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://onlinetools.ups.com/security/v1/oauth/token",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ 'Basic ' + $('Encode Credentials').item.json.encoded_credentials }}"
+            },
+            {
+              "name": "x-merchant-id",
+              "value": "string"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "form-urlencoded",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "grant_type",
+              "value": "client_credentials"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        560,
+        -144
+      ],
+      "id": "ef354c4e-1e94-4384-a883-f0bfae651ea5",
+      "name": "Get UPS Bearer Token"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "f58f5573-0941-4770-b747-d58700a09e1e",
+              "name": "ups_account_number1",
+              "value": "={{ \"R0600D\" }}",
+              "type": "string",
+              "mode": "json"
+            },
+            {
+              "id": "9d8b35b0-766b-496e-be46-a9da244e67de",
+              "name": "ups_account_number2",
+              "value": "={{ \"R060H2\" }}",
+              "type": "string"
+            },
+            {
+              "id": "9c5db593-8617-4872-99b2-809cef066eb1",
+              "name": "ups_account_numberChilly",
+              "value": "={{ \"V5426G\" }}",
+              "type": "string"
+            },
+            {
+              "id": "bab10aac-76fe-4483-9165-193a330c7ff2",
+              "name": "ups_account_number3",
+              "value": "={{ \"58919Y\" }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        784,
+        -144
+      ],
+      "id": "2f129e6a-87f1-45f8-9cff-7d9d1ca32e33",
+      "name": "Account List1"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://onlinetools.ups.com/api/rating/v2409/Shop",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ 'Bearer ' + $('Get UPS Bearer Token').item.json.access_token }}"
+            },
+            {
+              "name": "transId",
+              "value": "={{ $executionId + '-' + $item.index }}"
+            },
+            {
+              "name": "transactionSrc",
+              "value": "n8n-workflow"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ {\n  \"RateRequest\": {\n    \"Request\": {\n      \"TransactionReference\": {\n        \"CustomerContext\": \"n8n_rate_test\",\n        \"TransactionIdentifier\": $executionId\n      }\n    },\n    \"Shipment\": {\n      \"Shipper\": {\n        \"Name\": \"WELPAK\",\n        \"ShipperNumber\": $json.ups_account_number1,\n        \"Address\": {\n          \"AddressLine\": [\n            \"101 Industrial Dr.\"\n          ],\n          \"City\": \"Louisburg\",\n          \"StateProvinceCode\": \"NC\",\n          \"PostalCode\": \"27549\",\n          \"CountryCode\": \"US\"\n        }\n      },\n      \"ShipTo\": {\n        \"Name\": $('Dynamic Params1').item.json.firstName + ' ' + $('Dynamic Params1').item.json.lastName,\n        \"Address\": {\n          \"AddressLine\": [\n            $('Dynamic Params1').item.json.streetAddress\n          ],\n          \"City\": $('Dynamic Params1').item.json.city,\n          \"StateProvinceCode\": $('Dynamic Params1').item.json.state,\n          \"PostalCode\": $('Dynamic Params1').item.json.ZIPCode,\n          \"CountryCode\": \"US\",\n          ...([\"Comfort Stop\", \"Chilly Water\"].includes($('Dynamic Params1').item.json.Company) ? { \"ResidentialAddressIndicator\": \"\" } : {})\n        }\n      },\n      \"ShipFrom\": {\n        \"Name\": \"WELPAK\",\n        \"Address\": {\n          \"AddressLine\": [\n            \"101 Industrial Dr.\"\n          ],\n          \"City\": \"Louisburg\",\n          \"StateProvinceCode\": \"NC\",\n          \"PostalCode\": \"27549\",\n          \"CountryCode\": \"US\"\n        }\n      },\n      \"PaymentDetails\": {\n        \"ShipmentCharge\": [\n          {\n            \"Type\": \"01\",\n            \"BillShipper\": {\n              \"AccountNumber\": $json.ups_account_number1\n            }\n          }\n        ]\n      },\n      \"Package\": [\n        {\n          \"PackagingType\": {\n            \"Code\": \"02\"\n          },\n          \"Dimensions\": {\n            \"UnitOfMeasurement\": {\n              \"Code\": \"IN\"\n            },\n            \"Length\": $('Dynamic Params1').item.json.Length.toString(),\n            \"Width\": $('Dynamic Params1').item.json.Width.toString(),\n            \"Height\": $('Dynamic Params1').item.json.Height.toString()\n          },\n          \"PackageWeight\": {\n            \"UnitOfMeasurement\": {\n              \"Code\": \"LBS\"\n            },\n            \"Weight\": Math.max(1, parseFloat($('Dynamic Params1').item.json.Weight)).toString()\n          }\n        }\n      ],\n      \"ShipmentRatingOptions\": {\n        \"NegotiatedRatesIndicator\": \"\",\n        \"USPSAsEndiciaShipmentIndicator\": \"\"\n      }\n    }\n  }\n} }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1008,
+        -528
+      ],
+      "id": "00f47dec-1966-4325-9fe7-fc61734eea53",
+      "name": "Get UPS Rates For Account1"
+    },
+    {
+      "parameters": {
+        "jsCode": "// This node collects all the individual rate results from the loop,\n// combines them into a single list, and sorts them by the final price.\n\nconst allItems = $input.all();\nlet combinedRates = [];\n\n// Loop through each item coming into this node and add its data to our combined list.\nfor (const item of allItems) {\n  combinedRates.push(item.json);\n}\n\n// Sort the final combined list by negotiated price, from cheapest to most expensive.\ncombinedRates.sort((a, b) => a.negotiatedPrice - b.negotiatedPrice);\n\n// Return the single, sorted list.\n// n8n requires the data to be returned in a specific format.\nreturn combinedRates.map(item => ({ json: item }));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1456,
+        -528
+      ],
+      "id": "a28dec69-42bd-4327-ab6f-5a95a253c9cd",
+      "name": "Combine & Compare All Rates1"
+    },
+    {
+      "parameters": {
+        "jsCode": "const ratedShipments = $input.first().json.RateResponse.RatedShipment;\nconst currentAccount = $('Account List1').first().json.ups_account_number1;\n\nconst serviceCodeMap = {\n  \"01\": \"UPS Next Day Air\", \"02\": \"UPS 2nd Day Air\", \"03\": \"UPS Ground\", \"07\": \"UPS Worldwide Express\", \"08\": \"UPS Worldwide Expedited\", \"11\": \"UPS Standard\", \"12\": \"UPS 3 Day Select\", \"13\": \"UPS Next Day Air Saver\", \"14\": \"UPS Next Day Air Early\", \"54\": \"UPS Worldwide Express Plus\", \"59\": \"UPS 2nd Day Air A.M.\", \"65\": \"UPS Worldwide Saver\", \"92\": \"UPS SurePost (1 lb or More)\", \"93\": \"UPS Ground Saver\", \"94\": \"UPS SurePost (Less than 1 lb)\", \"M2\": \"UPS First Class Mail\", \"M3\": \"UPS Priority Mail\", \"M4\": \"UPS Expedited MaiI Innovations\", \"M5\": \"UPS Priority Mail Innovations\", \"M6\": \"UPS Economy Mail Innovations\"\n};\n\nif (!ratedShipments || ratedShipments.length === 0) {\n  return [];\n}\n\nconst formattedRates = ratedShipments.map(shipment => {\n  const serviceCode = shipment.Service.Code;\n  const negotiatedRate = shipment.NegotiatedRateCharges?.TotalCharge?.MonetaryValue;\n  const listRate = shipment.TotalCharges.MonetaryValue;\n\n  return {\n    json: {\n      account: currentAccount,\n      serviceName: serviceCodeMap[serviceCode] || `Unknown Service (${serviceCode})`,\n      serviceCode: serviceCode,\n      negotiatedPrice: parseFloat(negotiatedRate || listRate),\n      listPrice: parseFloat(listRate)\n    }\n  };\n});\n\nreturn formattedRates;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1232,
+        -528
+      ],
+      "id": "f29e4d91-17be-4659-a8e8-b94e48cf9faa",
+      "name": "Format Rates1"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://onlinetools.ups.com/api/rating/v2409/Shop",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ 'Bearer ' + $('Get UPS Bearer Token').item.json.access_token }}"
+            },
+            {
+              "name": "transId",
+              "value": "={{ $executionId + '-' + $item.index }}"
+            },
+            {
+              "name": "transactionSrc",
+              "value": "n8n-workflow"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \n  \"RateRequest\": {\n    \"Request\": {\n      \"TransactionReference\": {\n        \"CustomerContext\": \"n8n_rate_test\",\n        \"TransactionIdentifier\": $executionId\n      }\n    },\n    \"Shipment\": {\n      \"Shipper\": {\n        \"Name\": \"WELPAK\",\n        \"ShipperNumber\": $json.ups_account_number2,\n        \"Address\": {\n          \"AddressLine\": [\n            \"101 Industrial Dr.\"\n          ],\n          \"City\": \"Louisburg\",\n          \"StateProvinceCode\": \"NC\",\n          \"PostalCode\": \"27549\",\n          \"CountryCode\": \"US\"\n        }\n      },\n      \"ShipTo\": {\n        \"Name\": $('Dynamic Params1').item.json.firstName + ' ' + $('Dynamic Params1').item.json.lastName,\n        \"Address\": {\n          \"AddressLine\": [\n            $('Dynamic Params1').item.json.streetAddress\n          ],\n          \"City\": $('Dynamic Params1').item.json.city,\n          \"StateProvinceCode\": $('Dynamic Params1').item.json.state,\n          \"PostalCode\": $('Dynamic Params1').item.json.ZIPCode,\n          \"CountryCode\": \"US\",\n          ...([\"Comfort Stop\", \"Chilly Water\"].includes($('Dynamic Params1').item.json.Company) ? { \"ResidentialAddressIndicator\": \"\" } : {})\n        },\n        \"ResidentialAddressIndicator\": \"\"\n      },\n      \"ShipFrom\": {\n        \"Name\": \"WELPAK\",\n        \"Address\": {\n          \"AddressLine\": [\n            \"101 Industrial Dr.\"\n          ],\n          \"City\": \"Louisburg\",\n          \"StateProvinceCode\": \"NC\",\n          \"PostalCode\": \"27549\",\n          \"CountryCode\": \"US\"\n        }\n      },\n      \"PaymentDetails\": {\n        \"ShipmentCharge\": [\n          {\n            \"Type\": \"01\",\n            \"BillShipper\": {\n              \"AccountNumber\": $json.ups_account_number2\n            }\n          }\n        ]\n      },\n      \"Package\": [\n        {\n          \"PackagingType\": {\n            \"Code\": \"02\"\n          },\n          \"Dimensions\": {\n            \"UnitOfMeasurement\": {\n              \"Code\": \"IN\"\n            },\n            \"Length\": $('Dynamic Params1').item.json.Length.toString(),\n            \"Width\": $('Dynamic Params1').item.json.Width.toString(),\n            \"Height\": $('Dynamic Params1').item.json.Height.toString()\n          },\n          \"PackageWeight\": {\n            \"UnitOfMeasurement\": {\n              \"Code\": \"LBS\"\n            },\n            \"Weight\": $('Dynamic Params1').item.json.Weight.toString()\n          }\n        }\n      ],\n      \"ShipmentRatingOptions\": {\n        \"NegotiatedRatesIndicator\": \"\",\n        \"USPSAsEndiciaShipmentIndicator\": \"\"\n      }\n    }\n  }\n} }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1008,
+        -144
+      ],
+      "id": "d5daf0a9-2a51-4cdb-bd97-a8108bcf5206",
+      "name": "Get UPS Rates For Account"
+    },
+    {
+      "parameters": {
+        "jsCode": "// This node collects all the individual rate results from the loop,\n// combines them into a single list, and sorts them by the final price.\n\nconst allItems = $input.all();\nlet combinedRates = [];\n\n// Loop through each item coming into this node and add its data to our combined list.\nfor (const item of allItems) {\n  combinedRates.push(item.json);\n}\n\n// Sort the final combined list by negotiated price, from cheapest to most expensive.\ncombinedRates.sort((a, b) => a.negotiatedPrice - b.negotiatedPrice);\n\n// Return the single, sorted list.\n// n8n requires the data to be returned in a specific format.\nreturn combinedRates.map(item => ({ json: item }));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1456,
+        -144
+      ],
+      "id": "2b9fdee2-31ca-414e-8344-33ab8a7f6912",
+      "name": "Combine & Compare All Rates"
+    },
+    {
+      "parameters": {
+        "jsCode": "const ratedShipments = $input.first().json.RateResponse.RatedShipment;\nconst currentAccount = $('Account List1').first().json.ups_account_number2;\n\nconst serviceCodeMap = {\n  \"01\": \"UPS Next Day Air\", \"02\": \"UPS 2nd Day Air\", \"03\": \"UPS Ground\", \"07\": \"UPS Worldwide Express\", \"08\": \"UPS Worldwide Expedited\", \"11\": \"UPS Standard\", \"12\": \"UPS 3 Day Select\", \"13\": \"UPS Next Day Air Saver\", \"14\": \"UPS Next Day Air Early\", \"54\": \"UPS Worldwide Express Plus\", \"59\": \"UPS 2nd Day Air A.M.\", \"65\": \"UPS Worldwide Saver\", \"92\": \"UPS SurePost (1 lb or More)\", \"93\": \"UPS Ground Saver\", \"94\": \"UPS SurePost (Less than 1 lb)\", \"M2\": \"UPS First Class Mail\", \"M3\": \"UPS Priority Mail\", \"M4\": \"UPS Expedited MaiI Innovations\", \"M5\": \"UPS Priority Mail Innovations\", \"M6\": \"UPS Economy Mail Innovations\"\n};\n\nif (!ratedShipments || ratedShipments.length === 0) {\n  return [];\n}\n\nconst formattedRates = ratedShipments.map(shipment => {\n  const serviceCode = shipment.Service.Code;\n  const negotiatedRate = shipment.NegotiatedRateCharges?.TotalCharge?.MonetaryValue;\n  const listRate = shipment.TotalCharges.MonetaryValue;\n\n  return {\n    json: {\n      account: currentAccount,\n      serviceName: serviceCodeMap[serviceCode] || `Unknown Service (${serviceCode})`,\n      serviceCode: serviceCode,\n      negotiatedPrice: parseFloat(negotiatedRate || listRate),\n      listPrice: parseFloat(listRate)\n    }\n  };\n});\n\nreturn formattedRates;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1232,
+        -144
+      ],
+      "id": "8d3b9a5e-e3e3-494a-9d6a-a0d2634458a5",
+      "name": "Format Rates"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://onlinetools.ups.com/api/rating/v2409/rate",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ 'Bearer ' + $('Get UPS Bearer Token').item.json.access_token }}"
+            },
+            {
+              "name": "transId",
+              "value": "={{ $executionId + '-' + $item.index }}"
+            },
+            {
+              "name": "transactionSrc",
+              "value": "n8n-workflow"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \n  \"RateRequest\": {\n    \"Request\": {\n      \"TransactionReference\": {\n        \"CustomerContext\": \"n8n_rate_test\",\n        \"TransactionIdentifier\": $executionId\n      }\n    },\n    \"Shipment\": {\n      \"Shipper\": {\n        \"Name\": \"WELPAK\",\n        \"ShipperNumber\": $json.ups_account_number2,\n        \"Address\": {\n          \"AddressLine\": [\n            \"101 Industrial Dr.\"\n          ],\n          \"City\": \"Louisburg\",\n          \"StateProvinceCode\": \"NC\",\n          \"PostalCode\": \"27549\",\n          \"CountryCode\": \"US\"\n        }\n      },\n      \"ShipTo\": {\n        \"Name\": $('Dynamic Params1').item.json.firstName + ' ' + $('Dynamic Params1').item.json.lastName,\n        \"Address\": {\n          \"AddressLine\": [\n            $('Dynamic Params1').item.json.streetAddress\n          ],\n          \"City\": $('Dynamic Params1').item.json.city,\n          \"StateProvinceCode\": $('Dynamic Params1').item.json.state,\n          \"PostalCode\": $('Dynamic Params1').item.json.ZIPCode,\n          \"CountryCode\": \"US\",\n          ...([\"Comfort Stop\", \"Chilly Water\"].includes($('Dynamic Params1').item.json.Company) ? { \"ResidentialAddressIndicator\": \"\" } : {})\n        }\n      },\n      \"ShipFrom\": {\n        \"Name\": \"WELPAK\",\n        \"Address\": {\n          \"AddressLine\": [\n            \"101 Industrial Dr.\"\n          ],\n          \"City\": \"Louisburg\",\n          \"StateProvinceCode\": \"NC\",\n          \"PostalCode\": \"27549\",\n          \"CountryCode\": \"US\"\n        }\n      },\n      \"PaymentDetails\": {\n        \"ShipmentCharge\": [\n          {\n            \"Type\": \"01\",\n            \"BillShipper\": {\n              \"AccountNumber\": $json.ups_account_number2\n            }\n          }\n        ]\n      },\n      \"Service\": {\n        \"Code\": \"93\"\n      },\n      \"Package\": [\n        {\n          \"PackagingType\": {\n            \"Code\": \"02\"\n          },\n          \"Dimensions\": {\n            \"UnitOfMeasurement\": {\n              \"Code\": \"IN\"\n            },\n            \"Length\": $('Dynamic Params1').item.json.Length.toString(),\n            \"Width\": $('Dynamic Params1').item.json.Width.toString(),\n            \"Height\": $('Dynamic Params1').item.json.Height.toString()\n          },\n          \"PackageWeight\": {\n            \"UnitOfMeasurement\": {\n              \"Code\": \"LBS\"\n            },\n            \"Weight\": Math.max(1, parseFloat($('Dynamic Params1').item.json.Weight)).toString()\n          }\n        }\n      ],\n      \"ShipmentRatingOptions\": {\n        \"NegotiatedRatesIndicator\": \"\",\n        \"USPSAsEndiciaShipmentIndicator\": \"\"\n      }\n    }\n  }\n} }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1008,
+        48
+      ],
+      "id": "436bd288-6c42-4495-b0fe-b1336ab2cc22",
+      "name": "Get UPS Rates For Account2",
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// This node collects all the individual rate results from the loop,\n// combines them into a single list, and sorts them by the final price.\n\nconst allItems = $input.all();\nlet combinedRates = [];\n\n// Loop through each item coming into this node and add its data to our combined list.\nfor (const item of allItems) {\n  combinedRates.push(item.json);\n}\n\n// Sort the final combined list by negotiated price, from cheapest to most expensive.\ncombinedRates.sort((a, b) => a.negotiatedPrice - b.negotiatedPrice);\n\n// Return the single, sorted list.\n// n8n requires the data to be returned in a specific format.\nreturn combinedRates.map(item => ({ json: item }));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1456,
+        48
+      ],
+      "id": "0d8523e2-136b-4d12-94b1-e8475ce21f79",
+      "name": "Combine & Compare All Rates2"
+    },
+    {
+      "parameters": {
+        "jsCode": "const ratedShipments = $input.first().json.RateResponse.RatedShipment;\nconst currentAccount = $('Account List1').first().json.ups_account_number2;\n\nconst serviceCodeMap = {\n  \"01\": \"UPS Next Day Air\", \"02\": \"UPS 2nd Day Air\", \"03\": \"UPS Ground\", \"07\": \"UPS Worldwide Express\", \"08\": \"UPS Worldwide Expedited\", \"11\": \"UPS Standard\", \"12\": \"UPS 3 Day Select\", \"13\": \"UPS Next Day Air Saver\", \"14\": \"UPS Next Day Air Early\", \"54\": \"UPS Worldwide Express Plus\", \"59\": \"UPS 2nd Day Air A.M.\", \"65\": \"UPS Worldwide Saver\", \"92\": \"UPS SurePost (1 lb or More)\", \"93\": \"UPS Ground Saver\", \"94\": \"UPS SurePost (Less than 1 lb)\", \"M2\": \"UPS First Class Mail\", \"M3\": \"UPS Priority Mail\", \"M4\": \"UPS Expedited MaiI Innovations\", \"M5\": \"UPS Priority Mail Innovations\", \"M6\": \"UPS Economy Mail Innovations\"\n};\n\nif (!ratedShipments || ratedShipments.length === 0) {\n  return [];\n}\n\nconst formattedRates = ratedShipments.map(shipment => {\n  const serviceCode = shipment.Service.Code;\n  const negotiatedRate = shipment.NegotiatedRateCharges?.TotalCharge?.MonetaryValue;\n  const listRate = shipment.TotalCharges.MonetaryValue;\n\n  return {\n    json: {\n      account: currentAccount,\n      serviceName: serviceCodeMap[serviceCode] || `Unknown Service (${serviceCode})`,\n      serviceCode: serviceCode,\n      negotiatedPrice: parseFloat(negotiatedRate || listRate),\n      listPrice: parseFloat(listRate)\n    }\n  };\n});\n\nreturn formattedRates;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1232,
+        48
+      ],
+      "id": "67bf21fc-e36e-4e68-9fb4-6fcc6550fa79",
+      "name": "Format Rates2"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://onlinetools.ups.com/api/rating/v2409/Shop",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ 'Bearer ' + $('Get UPS Bearer Token').item.json.access_token }}"
+            },
+            {
+              "name": "transId",
+              "value": "={{ $executionId + '-' + $item.index }}"
+            },
+            {
+              "name": "transactionSrc",
+              "value": "n8n-workflow"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \n  \"RateRequest\": {\n    \"Request\": {\n      \"TransactionReference\": {\n        \"CustomerContext\": \"n8n_rate_test\",\n        \"TransactionIdentifier\": $executionId\n      }\n    },\n    \"Shipment\": {\n      \"Shipper\": {\n        \"Name\": \"WELPAK\",\n        \"ShipperNumber\": $json.ups_account_number3,\n        \"Address\": {\n          \"AddressLine\": [\n            \"101 Industrial Dr.\"\n          ],\n          \"City\": \"Louisburg\",\n          \"StateProvinceCode\": \"NC\",\n          \"PostalCode\": \"27549\",\n          \"CountryCode\": \"US\"\n        }\n      },\n      \"ShipTo\": {\n        \"Name\": $('Dynamic Params1').item.json.firstName + ' ' + $('Dynamic Params1').item.json.lastName,\n        \"Address\": {\n          \"AddressLine\": [\n            $('Dynamic Params1').item.json.streetAddress\n          ],\n          \"City\": $('Dynamic Params1').item.json.city,\n          \"StateProvinceCode\": $('Dynamic Params1').item.json.state,\n          \"PostalCode\": $('Dynamic Params1').item.json.ZIPCode,\n          \"CountryCode\": \"US\",\n          ...([\"Comfort Stop\", \"Chilly Water\"].includes($('Dynamic Params1').item.json.Company) ? { \"ResidentialAddressIndicator\": \"\" } : {})\n        },\n        \"ResidentialAddressIndicator\": \"\"\n      },\n      \"ShipFrom\": {\n        \"Name\": \"WELPAK\",\n        \"Address\": {\n          \"AddressLine\": [\n            \"101 Industrial Dr.\"\n          ],\n          \"City\": \"Louisburg\",\n          \"StateProvinceCode\": \"NC\",\n          \"PostalCode\": \"27549\",\n          \"CountryCode\": \"US\"\n        }\n      },\n      \"PaymentDetails\": {\n        \"ShipmentCharge\": [\n          {\n            \"Type\": \"01\",\n            \"BillShipper\": {\n              \"AccountNumber\": $json.ups_account_number3\n            }\n          }\n        ]\n      },\n      \"Package\": [\n        {\n          \"PackagingType\": {\n            \"Code\": \"02\"\n          },\n          \"Dimensions\": {\n            \"UnitOfMeasurement\": {\n              \"Code\": \"IN\"\n            },\n            \"Length\": $('Dynamic Params1').item.json.Length.toString(),\n            \"Width\": $('Dynamic Params1').item.json.Width.toString(),\n            \"Height\": $('Dynamic Params1').item.json.Height.toString()\n          },\n          \"PackageWeight\": {\n            \"UnitOfMeasurement\": {\n              \"Code\": \"LBS\"\n            },\n            \"Weight\": $('Dynamic Params1').item.json.Weight.toString()\n          }\n        }\n      ],\n      \"ShipmentRatingOptions\": {\n        \"NegotiatedRatesIndicator\": \"\",\n        \"USPSAsEndiciaShipmentIndicator\": \"\"\n      }\n    }\n  }\n} }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1008,
+        240
+      ],
+      "id": "27f3808a-28d1-4795-8ffa-e3a382183e41",
+      "name": "Get UPS Rates For Account4",
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// This node collects all the individual rate results from the loop,\n// combines them into a single list, and sorts them by the final price.\n\nconst allItems = $input.all();\nlet combinedRates = [];\n\n// Loop through each item coming into this node and add its data to our combined list.\nfor (const item of allItems) {\n  combinedRates.push(item.json);\n}\n\n// Sort the final combined list by negotiated price, from cheapest to most expensive.\ncombinedRates.sort((a, b) => a.negotiatedPrice - b.negotiatedPrice);\n\n// Return the single, sorted list.\n// n8n requires the data to be returned in a specific format.\nreturn combinedRates.map(item => ({ json: item }));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1456,
+        240
+      ],
+      "id": "e2e9e800-60d1-4aaf-ae68-e2f38b0af512",
+      "name": "Combine & Compare All Rates4"
+    },
+    {
+      "parameters": {
+        "jsCode": "const ratedShipments = $input.first().json.RateResponse.RatedShipment;\nconst currentAccount = $('Account List1').first().json.ups_account_number3;\n\nconst serviceCodeMap = {\n  \"01\": \"UPS Next Day Air\", \"02\": \"UPS 2nd Day Air\", \"03\": \"UPS Ground\", \"07\": \"UPS Worldwide Express\", \"08\": \"UPS Worldwide Expedited\", \"11\": \"UPS Standard\", \"12\": \"UPS 3 Day Select\", \"13\": \"UPS Next Day Air Saver\", \"14\": \"UPS Next Day Air Early\", \"54\": \"UPS Worldwide Express Plus\", \"59\": \"UPS 2nd Day Air A.M.\", \"65\": \"UPS Worldwide Saver\", \"92\": \"UPS SurePost (1 lb or More)\", \"93\": \"UPS Ground Saver\", \"94\": \"UPS SurePost (Less than 1 lb)\", \"M2\": \"UPS First Class Mail\", \"M3\": \"UPS Priority Mail\", \"M4\": \"UPS Expedited MaiI Innovations\", \"M5\": \"UPS Priority Mail Innovations\", \"M6\": \"UPS Economy Mail Innovations\"\n};\n\nif (!ratedShipments || ratedShipments.length === 0) {\n  return [];\n}\n\nconst formattedRates = ratedShipments.map(shipment => {\n  const serviceCode = shipment.Service.Code;\n  const negotiatedRate = shipment.NegotiatedRateCharges?.TotalCharge?.MonetaryValue;\n  const listRate = shipment.TotalCharges.MonetaryValue;\n\n  return {\n    json: {\n      account: currentAccount,\n      serviceName: serviceCodeMap[serviceCode] || `Unknown Service (${serviceCode})`,\n      serviceCode: serviceCode,\n      negotiatedPrice: parseFloat(negotiatedRate || listRate),\n      listPrice: parseFloat(listRate)\n    }\n  };\n});\n\nreturn formattedRates;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1232,
+        240
+      ],
+      "id": "f62b310d-0e08-4a37-b05a-154441139aa8",
+      "name": "Format Rates4"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "3bb5f00e-319f-45d8-90da-fd370bacab52",
+              "name": "firm",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "71f4b6f7-1424-421c-ae04-88b20de51c89",
+              "name": "firstName",
+              "value": "={{ $json.body.Name.split(' ')[0] }}",
+              "type": "string"
+            },
+            {
+              "id": "d48eb762-c2f1-4750-b97e-91f8d4d8d374",
+              "name": "lastName",
+              "value": "={{ $json.body.Name.split(' ').slice(1).join(' ') }}",
+              "type": "string"
+            },
+            {
+              "id": "946dc007-ae2a-4b97-aef7-a9475a87475a",
+              "name": "streetAddress",
+              "value": "={{ $json.body.Address1 }}",
+              "type": "string"
+            },
+            {
+              "id": "0f62ed00-0ab9-4eec-b495-4992e78376c0",
+              "name": "secondaryAddress",
+              "value": "={{ $json.body.Address2 }}",
+              "type": "string"
+            },
+            {
+              "id": "c3c68b34-54d6-4b64-bd4c-2abf156113f5",
+              "name": "city",
+              "value": "={{ $json.body.City }}",
+              "type": "string"
+            },
+            {
+              "id": "b4a86044-ceae-4ff9-95d2-f33bfe1b21d3",
+              "name": "state",
+              "value": "={{ $json.body.State }}",
+              "type": "string"
+            },
+            {
+              "id": "7a72f09c-f2df-4005-bff7-64a7ded3488c",
+              "name": "ZIPCode",
+              "value": "={{ $json.body.ZipCode.split('-')[0] }}",
+              "type": "string"
+            },
+            {
+              "id": "02e0196f-f4ca-49ce-8cb7-908eaf8429e3",
+              "name": "ZIPPlus4",
+              "value": "={{ ($json.body.ZipCode.split('-')[1] || '') }}",
+              "type": "string"
+            },
+            {
+              "id": "babfcd4d-39b7-4224-bb89-ed80260424fa",
+              "name": "Length",
+              "value": "={{ $json.body.Length || 11 }}",
+              "type": "number"
+            },
+            {
+              "id": "68125d72-7ec6-473d-b803-5398973f4038",
+              "name": "Width",
+              "value": "={{ $json.body.Width || 7 }}",
+              "type": "number"
+            },
+            {
+              "id": "7bc04696-f84b-4fd0-836c-01ecccb30334",
+              "name": "Height",
+              "value": "={{ $json.body.Height || 9 }}",
+              "type": "number"
+            },
+            {
+              "id": "f4476d15-a66f-4aa0-b575-0bb95a80fab5",
+              "name": "Weight",
+              "value": "={{ $json.body.Weight || 14 }}",
+              "type": "number"
+            },
+            {
+              "id": "87709b0b-0146-4936-8157-c5ad18d0da3d",
+              "name": "WeightUOM",
+              "value": "lb",
+              "type": "string"
+            },
+            {
+              "id": "63b15082-fe9c-44f1-8f42-296dbca62490",
+              "name": "DimensionsUOM",
+              "value": "in",
+              "type": "string"
+            },
+            {
+              "id": "21f03740-bcf7-4e7d-886b-759d0736cc5c",
+              "name": "usps_url",
+              "value": "={{ 'https://apis.usps.com' }}",
+              "type": "string"
+            },
+            {
+              "id": "5d2c415d-a4f4-47df-99c3-bce9e9b95f62",
+              "name": "Company",
+              "value": "={{ $json.body.Company || 'Welpak' }}",
+              "type": "string"
+            },
+            {
+              "id": "2aad2b41-8dd1-4d6b-8c82-0345de8554e4",
+              "name": "Phone",
+              "value": "={{\n  (function() {\n  \n      // --- Helper Function for Cleaning Phone Numbers ---\n      function cleanPhoneNumber(phoneNumber) {\n        let cleaned = (phoneNumber || '0000000000').split(/ext|extension|:/i)[0].replace(/\\D/g, '');\n        if (cleaned.startsWith('1') && cleaned.length === 11) {\n          return cleaned.substring(1);\n        }\n        return cleaned;\n      }\n  \n      // Call the function with your specific n8n variable and return the result\n      return cleanPhoneNumber($json[\"body\"][\"PhoneNumber\"]);\n  \n  })()\n}}",
+              "type": "string"
+            },
+            {
+              "id": "8099cc83-0518-46c1-92af-3e783394bdcd",
+              "name": "Email",
+              "value": "={{ $json[\"body\"][\"Email\"] || 'rmartin@welpakco.com'}}",
+              "type": "string"
+            },
+            {
+              "id": "1cd51eb9-1e6c-4c75-93fd-161589d26bb1",
+              "name": "SaleOrder",
+              "value": "={{ $json[\"body\"][\"SaleOrder\"] || '9842354905'}}",
+              "type": "string"
+            },
+            {
+              "id": "ca0e6389-4550-4c21-bc58-8b4b168712ac",
+              "name": "ups_base_url",
+              "value": "={{ 'https://onlinetools.ups.com' }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -112,
+        -144
+      ],
+      "id": "94984271-07d2-4fc4-aae8-881b87f98a25",
+      "name": "Dynamic Params1"
+    },
+    {
+      "parameters": {
+        "numberInputs": 6
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        1680,
+        -192
+      ],
+      "id": "7a6a434d-0e9c-4351-8568-8c739e1b75f2",
+      "name": "Merge"
+    }
+  ],
+  "connections": {
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Dynamic Params1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "UPS Credentials": {
+      "main": [
+        [
+          {
+            "node": "Encode Credentials",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Encode Credentials": {
+      "main": [
+        [
+          {
+            "node": "Get UPS Bearer Token",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get UPS Bearer Token": {
+      "main": [
+        [
+          {
+            "node": "Account List1",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 5
+          }
+        ]
+      ]
+    },
+    "Account List1": {
+      "main": [
+        [
+          {
+            "node": "Get UPS Rates For Account1",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Get UPS Rates For Account",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Get UPS Rates For Account2",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Get UPS Rates For Account3",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Get UPS Rates For Account4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get UPS Rates For Account1": {
+      "main": [
+        [
+          {
+            "node": "Format Rates1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Combine & Compare All Rates1": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Rates1": {
+      "main": [
+        [
+          {
+            "node": "Combine & Compare All Rates1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get UPS Rates For Account": {
+      "main": [
+        [
+          {
+            "node": "Format Rates",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Combine & Compare All Rates": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 2
+          }
+        ]
+      ]
+    },
+    "Format Rates": {
+      "main": [
+        [
+          {
+            "node": "Combine & Compare All Rates",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get UPS Rates For Account2": {
+      "main": [
+        [
+          {
+            "node": "Format Rates2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Combine & Compare All Rates2": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 3
+          }
+        ]
+      ]
+    },
+    "Format Rates2": {
+      "main": [
+        [
+          {
+            "node": "Combine & Compare All Rates2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get UPS Rates For Account3": {
+      "main": [
+        [
+          {
+            "node": "Format Rates3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Combine & Compare All Rates3": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Format Rates3": {
+      "main": [
+        [
+          {
+            "node": "Combine & Compare All Rates3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get UPS Rates For Account4": {
+      "main": [
+        [
+          {
+            "node": "Format Rates4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Combine & Compare All Rates4": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 4
+          }
+        ]
+      ]
+    },
+    "Format Rates4": {
+      "main": [
+        [
+          {
+            "node": "Combine & Compare All Rates4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Dynamic Params1": {
+      "main": [
+        [
+          {
+            "node": "UPS Credentials",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "instanceId": "34dbf6be0a29da969eb7893451909930b59204e81a41cfb32c06ffd48cfb47fe"
+  }
+}
