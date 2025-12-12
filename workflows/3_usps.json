@@ -1,0 +1,288 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -1664,
+        656
+      ],
+      "id": "f5d8913a-ba16-46b1-bab7-f15162c7c2fd",
+      "name": "When Executed by Another Workflow"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $node['Dynamic Params'].json.usps_url + '/oauth2/v3/token' }}",
+        "sendBody": true,
+        "contentType": "form-urlencoded",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "grant_type",
+              "value": "client_credentials"
+            },
+            {
+              "name": "client_id",
+              "value": "TMvzGU6cCYHHo1JXz7D8Df4EzEv9Lz79maA5otEDeGb6bPV2"
+            },
+            {
+              "name": "client_secret",
+              "value": "59AGwhCbHZLCj91KTPmpXnWxC8SbGTVdBGHM3wKx7H8GPri3OgGW5fgNjKA2NlV1"
+            },
+            {
+              "name": "scope"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -1216,
+        656
+      ],
+      "id": "c9a55aa3-b849-46b0-9d6a-16f60ae233ad",
+      "name": "Get Bearer Token2"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $node['Dynamic Params'].json.usps_url + '/shipments/v3/options/search'}}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ 'Bearer ' + $json.access_token }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ {\n  pricingOptions: [{ priceType: 'COMMERCIAL', paymentAccount: { accountType: 'EPS', accountNumber: '1000291907' } }],\n  originZIPCode: '27549',\n  destinationZIPCode: $('Dynamic Params').item.json.ZIPCode,\n  packageDescription: {\n    weight: $('Dynamic Params').item.json.Weight,\n    length: $('Dynamic Params').item.json.Length,\n    height: $('Dynamic Params').item.json.Height,\n    width: $('Dynamic Params').item.json.Width,\n    mailClass: 'ALL',\n    extraServices: [],\n    mailingDate: $now.toFormat('yyyy-MM-dd'),\n    packageValue: 0\n  }\n} }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -992,
+        656
+      ],
+      "id": "867f506d-4329-48c2-a488-ec6b6ab0e920",
+      "name": "Get Rates1",
+      "executeOnce": false
+    },
+    {
+      "parameters": {
+        "jsCode": "const results = [];\nconst items = $input.all();\n// We access Dynamic Params using .all() to get the corresponding item by index\n// This assumes 1-to-1 mapping and preserved order from the previous steps\nconst paramItems = $('Dynamic Params').all();\nconst bearerTokenItems = $('Get Bearer Token2').all();\n\nfor (let i = 0; i < items.length; i++) {\n  try {\n    const rateData = items[i].json;\n    \n    // Get corresponding params\n    // If paramItems has fewer items (e.g. executionOnce used), fallback to first/last or handle error\n    // Here we assume mapping by index is correct for passthrough\n    const params = (i < paramItems.length) ? paramItems[i].json : (paramItems[0]?.json || {});\n    \n    const packageWeight = params.Weight || 0;\n    const packageHeight = params.Height || 0;\n\n    // Get corresponding token\n    const tokenItem = (i < bearerTokenItems.length) ? bearerTokenItems[i] : (bearerTokenItems[0] || {});\n    const bearerToken = tokenItem.json ? tokenItem.json[\"access_token\"] : null;\n\n    const excludeMailClasses = [\n      'MEDIA_MAIL', 'LIBRARY_MAIL', 'BOUND_PRINTED_MATTER'\n    ];\n\n    const problematicServices = [\n      'USPS_CONNECT_LOCAL', 'USPS_CONNECT_REGIONAL'\n    ];\n\n    const flatRateIndicators = ['FE', 'FL', 'FM', 'FB', 'FC', 'FD', 'FF', 'FA', 'FP'];\n    const softPackIndicators = ['SP', 'P5', 'P6', 'P7', 'P8', 'P9', 'Q6', 'Q7', 'Q8', 'Q9', 'Q0', 'DE' ];\n\n    let allEligibleRates = [];\n\n    if (rateData.pricingOptions && rateData.pricingOptions[0]?.shippingOptions) {\n      for (const shippingOption of rateData.pricingOptions[0].shippingOptions) {\n        const mailClass = shippingOption.mailClass;\n        if (excludeMailClasses.includes(mailClass)) continue;\n\n        for (const rateOption of shippingOption.rateOptions) {\n          const rate = rateOption.rates[0];\n          const indicator = rate.rateIndicator || 'UNKNOWN';\n\n          if (flatRateIndicators.includes(indicator)) continue;\n          if (softPackIndicators.includes(indicator)) continue;\n          if (problematicServices.includes(mailClass)) continue;\n          if (!rate.processingCategory) continue;\n\n          allEligibleRates.push({\n            mailClass,\n            indicator,\n            totalPrice: rateOption.totalPrice,\n            rateOption: {\n              ...rateOption,\n              rates: [\n                {\n                  ...rate,\n                  rateIndicator: indicator,\n                  processingCategory: rate.processingCategory\n                }\n              ]\n            }\n          });\n        }\n      }\n    }\n\n    if (allEligibleRates.length === 0) {\n      results.push({\n        json: {\n          token: bearerToken,\n          message: \"❌ No eligible USPS rates matched.\",\n          debug: {\n            weight: packageWeight,\n            height: packageHeight\n          }\n        },\n        pairedItem: { item: i }\n      });\n      continue;\n    }\n\n    allEligibleRates.sort((a, b) => a.totalPrice - b.totalPrice);\n    const bestRate = allEligibleRates[0];\n\n    results.push({\n      json: {\n        token: bearerToken,\n        bestUSPSRate: bestRate\n      },\n      pairedItem: { item: i }\n    });\n\n  } catch (error) {\n    results.push({\n      json: {\n        error: true,\n        message: error.message\n      },\n      pairedItem: { item: i }\n    });\n  }\n}\n\nreturn results;\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -768,
+        656
+      ],
+      "id": "271a3a99-bf2f-457e-a24a-e1af60bc2e26",
+      "name": "Get Best Rate1"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "3bb5f00e-319f-45d8-90da-fd370bacab52",
+              "name": "firm",
+              "value": "",
+              "type": "string"
+            },
+            {
+              "id": "71f4b6f7-1424-421c-ae04-88b20de51c89",
+              "name": "firstName",
+              "value": "={{ $json.body.Name.split(' ')[0] }}",
+              "type": "string"
+            },
+            {
+              "id": "d48eb762-c2f1-4750-b97e-91f8d4d8d374",
+              "name": "lastName",
+              "value": "={{ $json.body.Name.split(' ').slice(1).join(' ') }}",
+              "type": "string"
+            },
+            {
+              "id": "946dc007-ae2a-4b97-aef7-a9475a87475a",
+              "name": "streetAddress",
+              "value": "={{ $json.body.Address1 }}",
+              "type": "string"
+            },
+            {
+              "id": "0f62ed00-0ab9-4eec-b495-4992e78376c0",
+              "name": "secondaryAddress",
+              "value": "={{ $json.body.Address2 }}",
+              "type": "string"
+            },
+            {
+              "id": "c3c68b34-54d6-4b64-bd4c-2abf156113f5",
+              "name": "city",
+              "value": "={{ $json.body.City }}",
+              "type": "string"
+            },
+            {
+              "id": "b4a86044-ceae-4ff9-95d2-f33bfe1b21d3",
+              "name": "state",
+              "value": "={{ $json.body.State }}",
+              "type": "string"
+            },
+            {
+              "id": "7a72f09c-f2df-4005-bff7-64a7ded3488c",
+              "name": "ZIPCode",
+              "value": "={{ $json.body.ZipCode.split('-')[0] }}",
+              "type": "string"
+            },
+            {
+              "id": "02e0196f-f4ca-49ce-8cb7-908eaf8429e3",
+              "name": "ZIPPlus4",
+              "value": "={{ ($json.body.ZipCode.split('-')[1] || '') }}",
+              "type": "string"
+            },
+            {
+              "id": "babfcd4d-39b7-4224-bb89-ed80260424fa",
+              "name": "Length",
+              "value": "={{ $json.body.Length || 11 }}",
+              "type": "number"
+            },
+            {
+              "id": "68125d72-7ec6-473d-b803-5398973f4038",
+              "name": "Width",
+              "value": "={{ $json.body.Width || 7 }}",
+              "type": "number"
+            },
+            {
+              "id": "7bc04696-f84b-4fd0-836c-01ecccb30334",
+              "name": "Height",
+              "value": "={{ $json.body.Height || 9 }}",
+              "type": "number"
+            },
+            {
+              "id": "f4476d15-a66f-4aa0-b575-0bb95a80fab5",
+              "name": "Weight",
+              "value": "={{ $json.body.Weight || 14 }}",
+              "type": "number"
+            },
+            {
+              "id": "87709b0b-0146-4936-8157-c5ad18d0da3d",
+              "name": "WeightUOM",
+              "value": "lb",
+              "type": "string"
+            },
+            {
+              "id": "63b15082-fe9c-44f1-8f42-296dbca62490",
+              "name": "DimensionsUOM",
+              "value": "in",
+              "type": "string"
+            },
+            {
+              "id": "21f03740-bcf7-4e7d-886b-759d0736cc5c",
+              "name": "usps_url",
+              "value": "={{ 'https://apis.usps.com' }}",
+              "type": "string"
+            },
+            {
+              "id": "5d2c415d-a4f4-47df-99c3-bce9e9b95f62",
+              "name": "Company",
+              "value": "={{ $json.body.Company || 'Welpak' }}",
+              "type": "string"
+            },
+            {
+              "id": "2aad2b41-8dd1-4d6b-8c82-0345de8554e4",
+              "name": "Phone",
+              "value": "={{\n (function() {\n \n // --- Helper Function for Cleaning Phone Numbers ---\n function cleanPhoneNumber(phoneNumber) {\n let cleaned = (phoneNumber || '0000000000').split(/ext|extension|:/i)[0].replace(/\\D/g, '');\n if (cleaned.startsWith('1') && cleaned.length === 11) {\n return cleaned.substring(1);\n }\n return cleaned;\n }\n \n // Call the function with your specific n8n variable and return the result\n return cleanPhoneNumber($json[\"body\"][\"PhoneNumber\"]);\n \n })()\n}}",
+              "type": "string"
+            },
+            {
+              "id": "8099cc83-0518-46c1-92af-3e783394bdcd",
+              "name": "Email",
+              "value": "={{ $json[\"body\"][\"Email\"] || 'rmartin@welpakco.com'}}",
+              "type": "string"
+            },
+            {
+              "id": "1cd51eb9-1e6c-4c75-93fd-161589d26bb1",
+              "name": "SaleOrder",
+              "value": "={{ $json[\"body\"][\"SaleOrder\"] || '9842354905'}}",
+              "type": "string"
+            },
+            {
+              "id": "ca0e6389-4550-4c21-bc58-8b4b168712ac",
+              "name": "ShippingMethod",
+              "value": "={{ $json.body.ShippingMethod }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -1440,
+        656
+      ],
+      "id": "87556ef7-30b3-4437-a8b0-5d8a3aafe00e",
+      "name": "Dynamic Params"
+    }
+  ],
+  "connections": {
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Dynamic Params",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Bearer Token2": {
+      "main": [
+        [
+          {
+            "node": "Get Rates1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Rates1": {
+      "main": [
+        [
+          {
+            "node": "Get Best Rate1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Dynamic Params": {
+      "main": [
+        [
+          {
+            "node": "Get Bearer Token2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "34dbf6be0a29da969eb7893451909930b59204e81a41cfb32c06ffd48cfb47fe"
+  }
+}
