@@ -1,0 +1,40 @@
+{
+  "name": "Amazon Orders - Data Transformation",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "manual-trigger",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "// This node transforms Amazon SP-API order data into the format expected by Odoo workflow\n\n// SKU to Product Mapping - UPDATE WITH YOUR ACTUAL SKUS\nconst SKU_TO_PRODUCT = {\n  'YOUR-12PACK-SKU': {\n    name: '12 Pack - Purified Chilly Water - 16oz Cans (SHIPPING INCLUDED)',\n    odooId: 6648\n  },\n  'YOUR-24PACK-SKU': {\n    name: '24 Pack - Purified Chilly Water - 16oz Cans (SHIPPING INCLUDED)',\n    odooId: 6794\n  },\n  'YOUR-12SPARK-SKU': {\n    name: '12 Pack - Sparkling Chilly Water - 16oz Cans (SHIPPING INCLUDED)',\n    odooId: 6827\n  },\n  'YOUR-6PACK-SKU': {\n    name: '6 Pack - Purified Chilly Water - 16oz Cans (SHIPPING INCLUDED)',\n    odooId: 6983\n  }\n};\n\n// Alternative: Match by title if SKUs are inconsistent\nfunction matchProductByTitle(title) {\n  const titleLower = title.toLowerCase();\n  \n  if (titleLower.includes('sparkling') && titleLower.includes('12')) {\n    return SKU_TO_PRODUCT['YOUR-12SPARK-SKU'];\n  }\n  if (titleLower.includes('24')) {\n    return SKU_TO_PRODUCT['YOUR-24PACK-SKU'];\n  }\n  if (titleLower.includes('6')) {\n    return SKU_TO_PRODUCT['YOUR-6PACK-SKU'];\n  }\n  if (titleLower.includes('12')) {\n    return SKU_TO_PRODUCT['YOUR-12PACK-SKU'];\n  }\n  return null;\n}\n\n// Get Amazon order data (assuming it comes from previous node)\nconst amazonOrder = $input.item.json.Order || $input.item.json;\nconst orderItems = $input.item.json.OrderItems || [];\n\n// Split full name into first and last\nfunction splitName(fullName) {\n  const parts = (fullName || '').trim().split(' ');\n  return {\n    firstName: parts[0] || '',\n    lastName: parts.slice(1).join(' ') || parts[0] || ''\n  };\n}\n\nconst shippingAddress = amazonOrder.ShippingAddress || {};\nconst buyerInfo = amazonOrder.BuyerInfo || {};\nconst nameParts = splitName(shippingAddress.Name);\n\n// Transform line items\nconst lineItemsStructured = orderItems\n  .map(item => {\n    // Try SKU mapping first\n    let product = SKU_TO_PRODUCT[item.SellerSKU];\n    \n    // Fallback to title matching\n    if (!product) {\n      product = matchProductByTitle(item.Title);\n    }\n    \n    // Skip if not a Chilly Water product\n    if (!product) return null;\n    \n    return {\n      name: product.name,\n      quantity: item.QuantityOrdered.toString()\n    };\n  })\n  .filter(item => item !== null);\n\n// If no Chilly Water products found, skip this order\nif (lineItemsStructured.length === 0) {\n  return [];\n}\n\n// Build the transformed order object\nconst transformedOrder = {\n  order: {\n    state: 'OPEN',\n    reference_id: amazonOrder.AmazonOrderId,\n    id: amazonOrder.AmazonOrderId,\n    fulfillments: [\n      {\n        uid: amazonOrder.AmazonOrderId,\n        type: 'SHIPMENT',\n        state: 'PROPOSED',\n        line_item_application: 'ALL',\n        shipment_details: {\n          recipient: {\n            display_name: shippingAddress.Name || 'Unknown',\n            email_address: buyerInfo.BuyerEmail || '',\n            phone_number: shippingAddress.Phone || '',\n            address: {\n              address_line_1: shippingAddress.AddressLine1 || '',\n              address_line_2: shippingAddress.AddressLine2 || '',\n              locality: shippingAddress.City || '',\n              administrative_district_level_1: shippingAddress.StateOrRegion || '',\n              postal_code: shippingAddress.PostalCode || '',\n              country: shippingAddress.CountryCode || 'US',\n              first_name: nameParts.firstName,\n              last_name: nameParts.lastName\n            }\n          },\n          shipping_type: 'FLAT',\n          placed_at: amazonOrder.PurchaseDate\n        }\n      }\n    ],\n    source: {\n      name: 'Amazon'\n    },\n    net_amount_due_money: {\n      amount: 0,\n      currency: 'USD'\n    }\n  },\n  line_items_structured: lineItemsStructured\n};\n\nreturn [{ json: transformedOrder }];"
+      },
+      "id": "transform-code",
+      "name": "Transform Amazon to Odoo Format",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [400, 0],
+      "notes": "Transforms Amazon SP-API order data into format expected by Odoo injection workflow"
+    }
+  ],
+  "connections": {
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "Transform Amazon to Odoo Format",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "meta": {
+    "instanceId": "example"
+  }
+}
