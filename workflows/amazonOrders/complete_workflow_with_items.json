@@ -93,7 +93,7 @@
           "parameters": [
             {
               "name": "x-amz-access-token",
-              "value": "={{ $node['Get OAuth Token'].json.access_token }}"
+              "value": "={{ $('Get OAuth Token').first().json.access_token }}"
             }
           ]
         },
