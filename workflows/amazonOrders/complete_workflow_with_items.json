@@ -1,0 +1,216 @@
+{
+  "name": "Amazon Orders - Complete Workflow",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "manual-trigger",
+      "name": "When clicking 'Execute workflow'",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.amazon.com/auth/o2/token",
+        "sendBody": true,
+        "contentType": "form-urlencoded",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "grant_type",
+              "value": "refresh_token"
+            },
+            {
+              "name": "refresh_token",
+              "value": "YOUR_AMAZON_REFRESH_TOKEN_HERE"
+            },
+            {
+              "name": "client_id",
+              "value": "YOUR_AMAZON_CLIENT_ID_HERE"
+            },
+            {
+              "name": "client_secret",
+              "value": "YOUR_AMAZON_CLIENT_SECRET_HERE"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [200, 0],
+      "id": "get-token",
+      "name": "Get OAuth Token"
+    },
+    {
+      "parameters": {
+        "url": "=https://sellingpartnerapi-na.amazon.com/orders/v0/orders?MarketplaceIds=ATVPDKIKX0DER&CreatedAfter={{ $now.minus(5, 'days').toISO() }}&OrderStatuses=Unshipped",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "awsAssumeRole",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-amz-access-token",
+              "value": "={{ $json.access_token }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [400, 0],
+      "id": "get-orders",
+      "name": "Get Orders",
+      "credentials": {
+        "awsAssumeRole": {
+          "id": "2n0tLzTg5EiEy354",
+          "name": "AWS (Assume Role) account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "=payload.Orders",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [600, 0],
+      "id": "split-orders",
+      "name": "Split Orders",
+      "notes": "Split the orders array so we can process each order individually"
+    },
+    {
+      "parameters": {
+        "url": "=https://sellingpartnerapi-na.amazon.com/orders/v0/orders/{{ $json.AmazonOrderId }}/orderItems",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "awsAssumeRole",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-amz-access-token",
+              "value": "={{ $node['Get OAuth Token'].json.access_token }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [800, 0],
+      "id": "get-order-items",
+      "name": "Get Order Items",
+      "notes": "THIS IS THE MISSING STEP! Fetch line items for each order",
+      "credentials": {
+        "awsAssumeRole": {
+          "id": "2n0tLzTg5EiEy354",
+          "name": "AWS (Assume Role) account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combinationMode": "mergeByPosition",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2.1,
+      "position": [1000, 0],
+      "id": "merge-order-and-items",
+      "name": "Merge Order + Items",
+      "notes": "Combine order data with its items"
+    },
+    {
+      "parameters": {
+        "jsCode": "// This node transforms Amazon SP-API order data into the format expected by Odoo workflow\n\n// SKU to Product Mapping - UPDATE WITH YOUR ACTUAL SKUS FROM AMAZON SELLER CENTRAL\nconst SKU_TO_PRODUCT = {\n  'YOUR-12PACK-SKU': {\n    name: '12 Pack - Purified Chilly Water - 16oz Cans (SHIPPING INCLUDED)',\n    odooId: 6648\n  },\n  'YOUR-24PACK-SKU': {\n    name: '24 Pack - Purified Chilly Water - 16oz Cans (SHIPPING INCLUDED)',\n    odooId: 6794\n  },\n  'YOUR-12SPARK-SKU': {\n    name: '12 Pack - Sparkling Chilly Water - 16oz Cans (SHIPPING INCLUDED)',\n    odooId: 6827\n  },\n  'YOUR-6PACK-SKU': {\n    name: '6 Pack - Purified Chilly Water - 16oz Cans (SHIPPING INCLUDED)',\n    odooId: 6983\n  }\n};\n\n// Alternative: Match by title if SKUs are inconsistent\nfunction matchProductByTitle(title) {\n  const titleLower = title.toLowerCase();\n\n  if (titleLower.includes('sparkling') && titleLower.includes('12')) {\n    return SKU_TO_PRODUCT['YOUR-12SPARK-SKU'];\n  }\n  if (titleLower.includes('24')) {\n    return SKU_TO_PRODUCT['YOUR-24PACK-SKU'];\n  }\n  if (titleLower.includes('6')) {    return SKU_TO_PRODUCT['YOUR-6PACK-SKU'];\n  }\n  if (titleLower.includes('12')) {\n    return SKU_TO_PRODUCT['YOUR-12PACK-SKU'];\n  }\n  return null;\n}\n\n// Get merged data (order from input 1, items from input 2)\nconst amazonOrder = $('Split Orders').item.json;\nconst orderItemsResponse = $json;\nconst orderItems = orderItemsResponse.payload?.OrderItems || [];\n\nconsole.log('Processing order:', amazonOrder.AmazonOrderId);\nconsole.log('Order items count:', orderItems.length);\n\n// If no order items, skip\nif (orderItems.length === 0) {\n  console.log('No items found, skipping order');\n  return [];\n}\n\n// Split full name into first and last\nfunction splitName(fullName) {\n  const parts = (fullName || '').trim().split(' ');\n  return {\n    firstName: parts[0] || '',\n    lastName: parts.slice(1).join(' ') || parts[0] || ''\n  };\n}\n\nconst shippingAddress = amazonOrder.ShippingAddress || {};\nconst buyerInfo = amazonOrder.BuyerInfo || {};\nconst nameParts = splitName(shippingAddress.Name);\n\n// Transform line items\nconst lineItemsStructured = orderItems\n  .map(item => {\n    console.log(`Checking: ${item.SellerSKU} - ${item.Title}`);\n\n    // Try SKU mapping first\n    let product = SKU_TO_PRODUCT[item.SellerSKU];\n\n    // Fallback to title matching\n    if (!product) {\n      product = matchProductByTitle(item.Title);\n      if (product) {\n        console.log(`  ✓ Matched by title`);\n      }\n    } else {\n      console.log(`  ✓ Matched by SKU`);\n    }\n\n    // Skip if not a Chilly Water product\n    if (!product) {\n      console.log(`  ✗ Not a Chilly Water product, skipping`);\n      return null;\n    }\n\n    return {\n      name: product.name,\n      quantity: item.QuantityOrdered.toString()\n    };\n  })\n  .filter(item => item !== null);\n\nconsole.log('Chilly Water items found:', lineItemsStructured.length);\n\n// If no Chilly Water products found, skip this order\nif (lineItemsStructured.length === 0) {\n  console.log('No Chilly Water products, skipping order');\n  return [];\n}\n\n// Build the transformed order object\nconst transformedOrder = {\n  order: {\n    state: 'OPEN',\n    reference_id: amazonOrder.AmazonOrderId,\n    id: amazonOrder.AmazonOrderId,\n    fulfillments: [\n      {\n        uid: amazonOrder.AmazonOrderId,\n        type: 'SHIPMENT',\n        state: 'PROPOSED',\n        line_item_application: 'ALL',\n        shipment_details: {\n          recipient: {\n            display_name: shippingAddress.Name || 'Unknown',\n            email_address: buyerInfo.BuyerEmail || '',\n            phone_number: shippingAddress.Phone || '',\n            address: {\n              address_line_1: shippingAddress.AddressLine1 || '',\n              address_line_2: shippingAddress.AddressLine2 || '',\n              locality: shippingAddress.City || '',\n              administrative_district_level_1: shippingAddress.StateOrRegion || '',\n              postal_code: shippingAddress.PostalCode || '',\n              country: shippingAddress.CountryCode || 'US',\n              first_name: nameParts.firstName,\n              last_name: nameParts.lastName\n            }\n          },\n          shipping_type: 'FLAT',\n          placed_at: amazonOrder.PurchaseDate\n        }\n      }\n    ],\n    source: {\n      name: 'Amazon'\n    },\n    net_amount_due_money: {\n      amount: 0,\n      currency: 'USD'\n    }\n  },\n  line_items_structured: lineItemsStructured\n};\n\nconsole.log('✅ Transformation successful!');\nreturn [{ json: transformedOrder }];"
+      },
+      "id": "transform-code",
+      "name": "Transform to Odoo Format",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1200, 0],
+      "notes": "Transforms Amazon data to match Square orders format for Odoo"
+    }
+  ],
+  "connections": {
+    "When clicking 'Execute workflow'": {
+      "main": [
+        [
+          {
+            "node": "Get OAuth Token",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get OAuth Token": {
+      "main": [
+        [
+          {
+            "node": "Get Orders",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Orders": {
+      "main": [
+        [
+          {
+            "node": "Split Orders",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Orders": {
+      "main": [
+        [
+          {
+            "node": "Get Order Items",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge Order + Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Order Items": {
+      "main": [
+        [
+          {
+            "node": "Merge Order + Items",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge Order + Items": {
+      "main": [
+        [
+          {
+            "node": "Transform to Odoo Format",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "meta": {
+    "instanceId": "example"
+  }
+}
