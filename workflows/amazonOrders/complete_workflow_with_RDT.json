@@ -1,0 +1,258 @@
+{
+  "name": "Amazon Orders - Complete with RDT (Restricted Data Token)",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "manual-trigger",
+      "name": "When clicking 'Execute workflow'",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.amazon.com/auth/o2/token",
+        "sendBody": true,
+        "contentType": "form-urlencoded",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "grant_type",
+              "value": "refresh_token"
+            },
+            {
+              "name": "refresh_token",
+              "value": "YOUR_AMAZON_REFRESH_TOKEN_HERE"
+            },
+            {
+              "name": "client_id",
+              "value": "YOUR_AMAZON_CLIENT_ID_HERE"
+            },
+            {
+              "name": "client_secret",
+              "value": "YOUR_AMAZON_CLIENT_SECRET_HERE"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [200, 0],
+      "id": "get-token",
+      "name": "Get OAuth Token"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://sellingpartnerapi-na.amazon.com/tokens/2021-03-01/restrictedDataToken",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "awsAssumeRole",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-amz-access-token",
+              "value": "={{ $json.access_token }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "body": "={\n  \"restrictedResources\": [\n    {\n      \"method\": \"GET\",\n      \"path\": \"/orders/v0/orders\",\n      \"dataElements\": [\"buyerInfo\", \"shippingAddress\"]\n    }\n  ]\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [400, 0],
+      "id": "get-rdt-token",
+      "name": "Get Restricted Data Token",
+      "notes": "Required to access customer PII (name, address)",
+      "credentials": {
+        "awsAssumeRole": {
+          "id": "2n0tLzTg5EiEy354",
+          "name": "AWS (Assume Role) account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "=https://sellingpartnerapi-na.amazon.com/orders/v0/orders?MarketplaceIds=ATVPDKIKX0DER&CreatedAfter={{ $now.minus(5, 'days').toISO() }}&OrderStatuses=Unshipped",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "awsAssumeRole",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-amz-access-token",
+              "value": "={{ $('Get Restricted Data Token').item.json.restrictedDataToken }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [600, 0],
+      "id": "get-orders",
+      "name": "Get Orders",
+      "notes": "Using RDT token to access customer PII",
+      "credentials": {
+        "awsAssumeRole": {
+          "id": "2n0tLzTg5EiEy354",
+          "name": "AWS (Assume Role) account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "=payload.Orders",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [800, 0],
+      "id": "split-orders",
+      "name": "Split Orders"
+    },
+    {
+      "parameters": {
+        "url": "=https://sellingpartnerapi-na.amazon.com/orders/v0/orders/{{ $json.AmazonOrderId }}/orderItems",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "awsAssumeRole",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-amz-access-token",
+              "value": "={{ $('Get OAuth Token').first().json.access_token }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [1000, 0],
+      "id": "get-order-items",
+      "name": "Get Order Items",
+      "credentials": {
+        "awsAssumeRole": {
+          "id": "2n0tLzTg5EiEy354",
+          "name": "AWS (Assume Role) account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combinationMode": "mergeByPosition",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2.1,
+      "position": [1200, 0],
+      "id": "merge-order-and-items",
+      "name": "Merge Order + Items"
+    },
+    {
+      "parameters": {
+        "jsCode": "// This node transforms Amazon SP-API order data into the format expected by Odoo workflow\n\n// SKU to Product Mapping - UPDATE WITH YOUR ACTUAL SKUS FROM AMAZON SELLER CENTRAL\nconst SKU_TO_PRODUCT = {\n  'YOUR-12PACK-SKU': {\n    name: '12 Pack - Purified Chilly Water - 16oz Cans (SHIPPING INCLUDED)',\n    odooId: 6648\n  },\n  'YOUR-24PACK-SKU': {\n    name: '24 Pack - Purified Chilly Water - 16oz Cans (SHIPPING INCLUDED)',\n    odooId: 6794\n  },\n  'YOUR-12SPARK-SKU': {\n    name: '12 Pack - Sparkling Chilly Water - 16oz Cans (SHIPPING INCLUDED)',\n    odooId: 6827\n  },\n  'YOUR-6PACK-SKU': {\n    name: '6 Pack - Purified Chilly Water - 16oz Cans (SHIPPING INCLUDED)',\n    odooId: 6983\n  }\n};\n\n// Alternative: Match by title if SKUs are inconsistent\nfunction matchProductByTitle(title) {\n  const titleLower = title.toLowerCase();\n\n  if (titleLower.includes('sparkling') && titleLower.includes('12')) {\n    return SKU_TO_PRODUCT['YOUR-12SPARK-SKU'];\n  }\n  if (titleLower.includes('24')) {\n    return SKU_TO_PRODUCT['YOUR-24PACK-SKU'];\n  }\n  if (titleLower.includes('6')) {\n    return SKU_TO_PRODUCT['YOUR-6PACK-SKU'];\n  }\n  if (titleLower.includes('12')) {\n    return SKU_TO_PRODUCT['YOUR-12PACK-SKU'];\n  }\n  return null;\n}\n\n// Get merged data\nconst amazonOrder = $('Split Orders').item.json;\nconst orderItemsResponse = $json;\nconst orderItems = orderItemsResponse.payload?.OrderItems || [];\n\nconsole.log('===== PROCESSING ORDER =====');\nconsole.log('Order ID:', amazonOrder.AmazonOrderId);\nconsole.log('Order items count:', orderItems.length);\n\n// DEBUG: Check what shipping data we received\nconst shippingAddress = amazonOrder.ShippingAddress || {};\nconsole.log('ShippingAddress keys:', Object.keys(shippingAddress));\nconsole.log('Name:', shippingAddress.Name);\nconsole.log('AddressLine1:', shippingAddress.AddressLine1);\nconsole.log('City:', shippingAddress.City);\n\n// If no order items, skip\nif (orderItems.length === 0) {\n  console.log('No items found, skipping order');\n  return [];\n}\n\n// Improved name extraction with multiple fallbacks\nfunction getShipToName(amazonOrder) {\n  const shippingAddress = amazonOrder.ShippingAddress || {};\n  const buyerInfo = amazonOrder.BuyerInfo || {};\n\n  // Try multiple locations\n  const possibleNames = [\n    shippingAddress.Name,\n    buyerInfo.BuyerName,\n    shippingAddress.CompanyName,\n    amazonOrder.Name\n  ];\n\n  for (const name of possibleNames) {\n    if (name && typeof name === 'string' && name.trim().length > 0) {\n      console.log(`✓ Found name: \"${name}\"`);\n      return name.trim();\n    }\n  }\n\n  console.warn('⚠️ No ship-to name found, using fallback');\n  return `Customer at ${shippingAddress.City || 'Unknown'}`;\n}\n\n// Split full name into first and last\nfunction splitName(fullName) {\n  const parts = (fullName || '').trim().split(' ');\n  return {\n    firstName: parts[0] || 'Customer',\n    lastName: parts.slice(1).join(' ') || parts[0] || 'Unknown'\n  };\n}\n\nconst buyerInfo = amazonOrder.BuyerInfo || {};\nconst shipToName = getShipToName(amazonOrder);\nconst nameParts = splitName(shipToName);\n\nconsole.log('Using name:', shipToName);\nconsole.log('First/Last:', nameParts.firstName, '/', nameParts.lastName);\n\n// Get address with fallbacks\nconst addressLine1 = shippingAddress.AddressLine1 || \n                     shippingAddress.AddressLine2 || \n                     '[Address Restricted by Amazon]';\n\nif (!shippingAddress.AddressLine1) {\n  console.warn('⚠️ AddressLine1 is missing! May need RDT token.');\n}\n\n// Transform line items\nconst lineItemsStructured = orderItems\n  .map(item => {\n    console.log(`Checking: ${item.SellerSKU} - ${item.Title}`);\n\n    let product = SKU_TO_PRODUCT[item.SellerSKU];\n\n    if (!product) {\n      product = matchProductByTitle(item.Title);\n      if (product) {\n        console.log(`  ✓ Matched by title`);\n      }\n    } else {\n      console.log(`  ✓ Matched by SKU`);\n    }\n\n    if (!product) {\n      console.log(`  ✗ Not a Chilly Water product`);\n      return null;\n    }\n\n    return {\n      name: product.name,\n      quantity: item.QuantityOrdered.toString()\n    };\n  })\n  .filter(item => item !== null);\n\nconsole.log('Chilly Water items found:', lineItemsStructured.length);\n\nif (lineItemsStructured.length === 0) {\n  console.log('No Chilly Water products, skipping');\n  return [];\n}\n\n// Build transformed order\nconst transformedOrder = {\n  order: {\n    state: 'OPEN',\n    reference_id: amazonOrder.AmazonOrderId,\n    id: amazonOrder.AmazonOrderId,\n    fulfillments: [\n      {\n        uid: amazonOrder.AmazonOrderId,\n        type: 'SHIPMENT',\n        state: 'PROPOSED',\n        line_item_application: 'ALL',\n        shipment_details: {\n          recipient: {\n            display_name: shipToName,\n            email_address: buyerInfo.BuyerEmail || '',\n            phone_number: shippingAddress.Phone || '',\n            address: {\n              address_line_1: addressLine1,\n              address_line_2: shippingAddress.AddressLine2 || '',\n              locality: shippingAddress.City || '',\n              administrative_district_level_1: shippingAddress.StateOrRegion || '',\n              postal_code: shippingAddress.PostalCode || '',\n              country: shippingAddress.CountryCode || 'US',\n              first_name: nameParts.firstName,\n              last_name: nameParts.lastName\n            }\n          },\n          shipping_type: 'FLAT',\n          placed_at: amazonOrder.PurchaseDate\n        }\n      }\n    ],\n    source: {\n      name: 'Amazon'\n    },\n    net_amount_due_money: {\n      amount: 0,\n      currency: 'USD'\n    }\n  },\n  line_items_structured: lineItemsStructured\n};\n\nconsole.log('✅ Transformation successful!');\nconsole.log('============================');\nreturn [{ json: transformedOrder }];"
+      },
+      "id": "transform-code",
+      "name": "Transform to Odoo Format",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1400, 0],
+      "notes": "Transforms with improved name/address handling"
+    }
+  ],
+  "connections": {
+    "When clicking 'Execute workflow'": {
+      "main": [
+        [
+          {
+            "node": "Get OAuth Token",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get OAuth Token": {
+      "main": [
+        [
+          {
+            "node": "Get Restricted Data Token",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Restricted Data Token": {
+      "main": [
+        [
+          {
+            "node": "Get Orders",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Orders": {
+      "main": [
+        [
+          {
+            "node": "Split Orders",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Orders": {
+      "main": [
+        [
+          {
+            "node": "Get Order Items",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge Order + Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Order Items": {
+      "main": [
+        [
+          {
+            "node": "Merge Order + Items",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge Order + Items": {
+      "main": [
+        [
+          {
+            "node": "Transform to Odoo Format",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "meta": {
+    "instanceId": "example"
+  }
+}
