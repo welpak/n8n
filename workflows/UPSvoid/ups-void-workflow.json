@@ -1,0 +1,317 @@
+{
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        80
+      ],
+      "id": "95d38d3e-2a72-4e1a-b026-c9605aecd473",
+      "name": "When clicking 'Execute workflow'"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "59739fea-1d82-4096-9fa9-306fae87a939",
+              "name": "trackingNums",
+              "value": "[\"1Z999AA10123456784\"]",
+              "type": "array"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        224,
+        80
+      ],
+      "id": "3e83eef1-05b2-40e8-bd0c-50dfecc268b9",
+      "name": "Edit Fields"
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "trackingNums",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        432,
+        80
+      ],
+      "id": "b60b5523-c02e-45b0-a31a-5254f1093f61",
+      "name": "Split Out"
+    },
+    {
+      "parameters": {
+        "options": {
+          "reset": false
+        }
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        656,
+        80
+      ],
+      "id": "313cc4dd-394a-4fcd-9774-86a777dc562a",
+      "name": "Loop Over Items"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "21f03740-bcf7-4e7d-886b-759d0736cc5c",
+              "name": "ups_url",
+              "value": "https://onlinetools.ups.com",
+              "type": "string"
+            },
+            {
+              "id": "4cbbd07d-f304-4700-be85-fc370c3c0307",
+              "name": "trackingNumber",
+              "value": "={{ $json.trackingNums.replaceAll(' ', '') }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        896,
+        96
+      ],
+      "id": "b0a52048-c154-43c6-98bb-1fcfb68c4c58",
+      "name": "Params"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "e4f8d975-f852-4467-8c33-b1d1f03403d1",
+              "name": "client_id",
+              "value": "0A1Ls7QRWjDyuJxl0agsOwnvhSyuDYilcZi1fqZZ5KsHzEa3",
+              "type": "string"
+            },
+            {
+              "id": "c62002f2-c2e8-4676-bdc0-388a10731456",
+              "name": "client_secret",
+              "value": "TUAhIebS8nPxs8lyoKysGLXv7qIFkgmTsC6ZbbRnY1GHlAIApCl0xBw7xBASZpvk",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1120,
+        96
+      ],
+      "id": "c41e0ac0-33e2-455a-9f7a-d7fc527a1ddc",
+      "name": "UPS Credentials"
+    },
+    {
+      "parameters": {
+        "jsCode": "// This node combines and Base64-encodes the credentials for the Basic Auth header.\n\nconst clientId = $input.first().json.client_id;\nconst clientSecret = $input.first().json.client_secret;\n\n// Combine credentials in the format 'clientId:clientSecret'\nconst credentials = clientId + ':' + clientSecret;\n\n// Base64 encode the combined string.\nconst encoded = Buffer.from(credentials).toString('base64');\n\n// Return the result for the next node to use.\nreturn [{ \n  json: { \n    encoded_credentials: encoded \n  } \n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1328,
+        96
+      ],
+      "id": "6c40043d-bd4a-4124-a83f-00fad3211f8d",
+      "name": "Encode Credentials"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Params').item.json.ups_url + '/security/v1/oauth/token' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ 'Basic ' + $('Encode Credentials').item.json.encoded_credentials }}"
+            },
+            {
+              "name": "x-merchant-id",
+              "value": "string"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "form-urlencoded",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "grant_type",
+              "value": "client_credentials"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1552,
+        96
+      ],
+      "id": "38ee82bf-eb5e-40e7-85cb-eb65fdc17172",
+      "name": "Get UPS Bearer Token"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Params').item.json.ups_url + '/api/shipments/v1/void/cancel/' + $('Params').item.json.trackingNumber }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ 'Bearer ' + $('Get UPS Bearer Token').item.json.access_token }}"
+            },
+            {
+              "name": "transId",
+              "value": "={{ $executionId + '-' + $item.index }}"
+            },
+            {
+              "name": "transactionSrc",
+              "value": "n8n-workflow"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"VoidShipmentRequest\": {\n    \"Request\": {\n      \"TransactionReference\": {\n        \"CustomerContext\": \"n8n_void_shipment\",\n        \"TransactionIdentifier\": \"{{ $executionId }}\"\n      }\n    },\n    \"VoidShipment\": {\n      \"ShipmentIdentificationNumber\": \"{{ $('Params').item.json.trackingNumber }}\"\n    }\n  }\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1776,
+        96
+      ],
+      "id": "a8a80c02-c9e3-4fec-b922-29d589a06c98",
+      "name": "Void UPS Shipment"
+    }
+  ],
+  "connections": {
+    "When clicking 'Execute workflow'": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "Split Out",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Out": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Params",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Params": {
+      "main": [
+        [
+          {
+            "node": "UPS Credentials",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "UPS Credentials": {
+      "main": [
+        [
+          {
+            "node": "Encode Credentials",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Encode Credentials": {
+      "main": [
+        [
+          {
+            "node": "Get UPS Bearer Token",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get UPS Bearer Token": {
+      "main": [
+        [
+          {
+            "node": "Void UPS Shipment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Void UPS Shipment": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "instanceId": "34dbf6be0a29da969eb7893451909930b59204e81a41cfb32c06ffd48cfb47fe"
+  }
+}
