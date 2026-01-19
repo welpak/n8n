@@ -174,8 +174,8 @@
     },
     {
       "parameters": {
-        "method": "POST",
-        "url": "={{ $('Params').item.json.ups_url + '/api/shipments/v1/void/cancel/' + $('Params').item.json.trackingNumber }}",
+        "method": "DELETE",
+        "url": "={{ $('Params').item.json.ups_url + '/api/shipments/v2403/void/cancel/' + $('Params').item.json.trackingNumber + '?trackingnumber=' + $('Params').item.json.trackingNumber }}",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -193,9 +193,6 @@
             }
           ]
         },
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={\n  \"VoidShipmentRequest\": {\n    \"Request\": {\n      \"TransactionReference\": {\n        \"CustomerContext\": \"n8n_void_shipment\",\n        \"TransactionIdentifier\": \"{{ $executionId }}\"\n      }\n    },\n    \"VoidShipment\": {\n      \"ShipmentIdentificationNumber\": \"{{ $('Params').item.json.trackingNumber }}\"\n    }\n  }\n}",
         "options": {}
       },
       "type": "n8n-nodes-base.httpRequest",
