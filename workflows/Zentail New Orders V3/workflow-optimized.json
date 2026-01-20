@@ -180,7 +180,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Prepare complete contact information\nconst locationData = $node[\"Merge Country Result\"].json;\nconst orderData = locationData.orderData;\nconst shippingAddress = orderData.shippingAddress;\n\n// Get state ID if lookup was performed\nlet stateId = null;\nif (locationData.needsStateLookup && $input.item.json.id) {\n  stateId = $input.item.json.id;\n}\n\nconst toTitleCase = (str) => {\n  if (!str) return '';\n  return str.toLowerCase().split(' ').map(word => \n    word.charAt(0).toUpperCase() + word.slice(1)\n  ).join(' ');\n};\n\nconst isBlacklisted = (shippingAddress.name || '').toLowerCase().includes('beetox');\n\nreturn {\n  json: {\n    contactInfo: {\n      name: toTitleCase(shippingAddress.name || ''),\n      street: shippingAddress.addressLine1 || '',\n      street2: shippingAddress.addressLine2 || '',\n      city: toTitleCase(shippingAddress.city || ''),\n      state_id: stateId,\n      zip: shippingAddress.postalCode || '',\n      country_id: locationData.countryId,\n      email: shippingAddress.email || '',\n      phone: shippingAddress.phone || ''\n    },\n    orderData,\n    isBlacklisted\n  }\n};"
+        "jsCode": "// Prepare complete contact information\nconst locationData = $node[\"Merge Country Result\"].json;\nconst orderData = locationData.orderData;\nconst shippingAddress = orderData.shippingAddress;\n\n// Get state ID if lookup was performed\nlet stateId = null;\nif (locationData.needsStateLookup && $input.item.json.id) {\n  stateId = $input.item.json.id;\n}\n\nconst toTitleCase = (str) => {\n  if (!str) return '';\n  return str.toLowerCase().split(' ').map(word => \n    word.charAt(0).toUpperCase() + word.slice(1)\n  ).join(' ');\n};\n\n// Blacklist check - Add more terms to this array as needed\nconst BLACKLISTED_TERMS = [\n  'beetox',\n  // Add more blacklisted terms here (case-insensitive)\n  // 'example1',\n  // 'example2',\n];\n\nconst customerName = (shippingAddress.name || '').toLowerCase();\nconst isBlacklisted = BLACKLISTED_TERMS.some(term => customerName.includes(term.toLowerCase()));\n\nreturn {\n  json: {\n    contactInfo: {\n      name: toTitleCase(shippingAddress.name || ''),\n      street: shippingAddress.addressLine1 || '',\n      street2: shippingAddress.addressLine2 || '',\n      city: toTitleCase(shippingAddress.city || ''),\n      state_id: stateId,\n      zip: shippingAddress.postalCode || '',\n      country_id: locationData.countryId,\n      email: shippingAddress.email || '',\n      phone: shippingAddress.phone || ''\n    },\n    orderData,\n    isBlacklisted\n  }\n};"
       },
       "id": "prepare-contact",
       "name": "Prepare Contact Data",
@@ -195,10 +195,11 @@
             {
               "id": "is-blacklisted",
               "leftValue": "={{ $json.isBlacklisted }}",
-              "rightValue": true,
+              "rightValue": "",
               "operator": {
                 "type": "boolean",
-                "operation": "true"
+                "operation": "true",
+                "singleValue": true
               }
             }
           ]
