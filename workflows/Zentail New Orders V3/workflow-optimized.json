@@ -1,0 +1,704 @@
+{
+  "name": "Zentail New Orders V3 - Optimized",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "execute-trigger",
+      "name": "Execute Workflow Trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1,
+      "position": [-400, -200]
+    },
+    {
+      "parameters": {},
+      "id": "manual-trigger",
+      "name": "When clicking \"Test workflow\"",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [-400, 0]
+    },
+    {
+      "parameters": {
+        "url": "https://api.zentail.com/v1/salesOrder",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "status",
+              "value": "PENDING"
+            },
+            {
+              "name": "pageLength",
+              "value": "100"
+            },
+            {
+              "name": "warehouseId",
+              "value": "8"
+            },
+            {
+              "name": "channelOrderIds",
+              "value": "={{ $json.channelOrderId }}"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "ACCEPT",
+              "value": "application/json"
+            },
+            {
+              "name": "AUTHORIZATION",
+              "value": "Ecth02rbCUTK7cQo_XpfMlwmKMFWe4RlQHHz8j3ookI="
+            }
+          ]
+        },
+        "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 10
+            }
+          }
+        }
+      },
+      "id": "fetch-orders",
+      "name": "Fetch Zentail Orders",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [-200, -100]
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "results",
+        "options": {}
+      },
+      "id": "split-results",
+      "name": "Split Orders",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [0, -100]
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "loop-orders",
+      "name": "Loop Over Orders",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [200, -100],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Smart State and Country Lookup Logic\nconst shippingAddress = $input.item.json.shippingAddress;\nconst countryCode = shippingAddress.countryCode?.toUpperCase() || '';\nconst stateCode = shippingAddress.state?.replace(/[.,;:!?]/g, '').trim() || '';\n\n// Country IDs that don't require state lookup\nconst NO_STATE_COUNTRIES = [181, 20, 224, 231, 75, 55, 43, 173, 88, 57, 240, 165, 91, 68, 227];\n\n// Common country codes to IDs (most common ones)\nconst COUNTRY_MAP = {\n  'US': 233,\n  'CA': 40,\n  'MX': 156,\n  'GB': 231,\n  'AU': 14,\n  'DE': 59,\n  'FR': 76,\n  'IT': 112,\n  'ES': 68,\n  'NL': 165,\n  'BE': 20,\n  'CH': 214,\n  'AT': 15,\n  'SE': 210,\n  'NO': 167,\n  'DK': 59,\n  'FI': 73,\n  'IE': 106,\n  'NZ': 166,\n  'SG': 198,\n  'JP': 115,\n  'KR': 122,\n  'CN': 47,\n  'IN': 105,\n  'BR': 32,\n  'AR': 11,\n  'CL': 46,\n  'CO': 49,\n  'PE': 174\n};\n\nreturn {\n  json: {\n    countryCode,\n    stateCode,\n    countryId: COUNTRY_MAP[countryCode] || null,\n    needsStateLookup: stateCode.length > 2 && !NO_STATE_COUNTRIES.includes(COUNTRY_MAP[countryCode]),\n    needsCountryLookup: !COUNTRY_MAP[countryCode],\n    shippingAddress,\n    orderData: $input.item.json\n  }\n};"
+      },
+      "id": "smart-lookup-prep",
+      "name": "Smart Lookup Prep",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [400, -100]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "conditions": [
+            {
+              "id": "needs-country-lookup",
+              "leftValue": "={{ $json.needsCountryLookup }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ]
+        }
+      },
+      "id": "check-country-lookup",
+      "name": "Needs Country Lookup?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [600, -100]
+    },
+    {
+      "parameters": {
+        "resource": "custom",
+        "customResource": "res.country",
+        "operation": "getAll",
+        "limit": 1,
+        "options": {
+          "fieldsList": ["id", "code", "name"]
+        },
+        "filterRequest": {
+          "filter": [
+            {
+              "fieldName": "code",
+              "value": "={{ $json.countryCode }}"
+            }
+          ]
+        }
+      },
+      "id": "lookup-country",
+      "name": "Lookup Country",
+      "type": "n8n-nodes-base.odoo",
+      "typeVersion": 1,
+      "position": [800, -200],
+      "alwaysOutputData": true,
+      "credentials": {
+        "odooApi": {
+          "id": "eCEcpp3pBHncPgxX",
+          "name": "Comfort Stop Bot Odoo"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Merge country lookup result\nconst previousData = $node[\"Smart Lookup Prep\"].json;\nconst countryData = $input.item.json;\n\nreturn {\n  json: {\n    ...previousData,\n    countryId: countryData.id || previousData.countryId\n  }\n};"
+      },
+      "id": "merge-country",
+      "name": "Merge Country Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1000, -200]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "conditions": [
+            {
+              "id": "needs-state",
+              "leftValue": "={{ $json.needsStateLookup }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ]
+        }
+      },
+      "id": "check-state-lookup",
+      "name": "Needs State Lookup?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1200, -100]
+    },
+    {
+      "parameters": {
+        "resource": "custom",
+        "customResource": "res.country.state",
+        "operation": "getAll",
+        "limit": 1,
+        "options": {
+          "fieldsList": ["id", "name", "country_id", "code"]
+        },
+        "filterRequest": {
+          "filter": [
+            {
+              "fieldName": "country_id",
+              "value": "={{ $json.countryId }}"
+            },
+            {
+              "fieldName": "name",
+              "value": "={{ $json.stateCode.split(' ').map(w => w === 'of' ? 'of' : w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ') }}"
+            }
+          ]
+        }
+      },
+      "id": "lookup-state",
+      "name": "Lookup State",
+      "type": "n8n-nodes-base.odoo",
+      "typeVersion": 1,
+      "position": [1400, -200],
+      "alwaysOutputData": true,
+      "credentials": {
+        "odooApi": {
+          "id": "eCEcpp3pBHncPgxX",
+          "name": "Comfort Stop Bot Odoo"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Prepare contact data\nconst baseData = $input.item.json;\nconst shippingAddress = baseData.shippingAddress || baseData.orderData.shippingAddress;\nconst stateId = baseData.stateId || $node[\"Lookup State\"]?.json?.id || null;\nconst countryId = baseData.countryId;\n\nconst toTitleCase = (str) => {\n  if (!str) return '';\n  return str.toLowerCase().split(' ').map(word => \n    word.charAt(0).toUpperCase() + word.slice(1)\n  ).join(' ');\n};\n\nreturn {\n  json: {\n    contactInfo: {\n      name: toTitleCase(shippingAddress.name),\n      street: shippingAddress.addressLine1,\n      street2: shippingAddress.addressLine2 || '',\n      city: toTitleCase(shippingAddress.city),\n      state_id: stateId,\n      zip: shippingAddress.postalCode,\n      country_id: countryId,\n      email: shippingAddress.email,\n      phone: shippingAddress.phone\n    },\n    orderData: baseData.orderData,\n    isBlacklisted: shippingAddress.name.toLowerCase().includes('beetox')\n  }\n};"
+      },
+      "id": "prepare-contact",
+      "name": "Prepare Contact Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1600, -100]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "conditions": [
+            {
+              "id": "is-blacklisted",
+              "leftValue": "={{ $json.isBlacklisted }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ]
+        }
+      },
+      "id": "check-blacklist",
+      "name": "Check Blacklist",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1800, -100]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Prepare cancellation request\nconst orderData = $input.item.json.orderData;\nconst products = orderData.products || [];\n\nreturn {\n  json: {\n    reason: \"Cancelled In Odoo\",\n    products: products.map(product => ({\n      lineItemId: product.lineItemId || null,\n      cancelQuantity: product.quantity || 0,\n      restockQuantities: [{\n        warehouseId: 8,\n        quantity: product.quantity || 0\n      }]\n    })),\n    orderNumber: orderData.orderNumber\n  }\n};"
+      },
+      "id": "prep-cancellation",
+      "name": "Prepare Cancellation",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2000, -300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ \"https://api.zentail.com/v1/salesOrder/cancel/\" + $json.orderNumber }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "AUTHORIZATION",
+              "value": "Ecth02rbCUTK7cQo_XpfMlwmKMFWe4RlQHHz8j3ookI="
+            },
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { reason: $json.reason, products: $json.products } }}",
+        "options": {}
+      },
+      "id": "cancel-order",
+      "name": "Cancel Order in Zentail",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2200, -300]
+    },
+    {
+      "parameters": {
+        "resource": "custom",
+        "customResource": "res.partner",
+        "operation": "getAll",
+        "limit": 1,
+        "options": {
+          "fieldsList": ["id", "name"]
+        },
+        "filterRequest": {
+          "filter": [
+            {
+              "fieldName": "name",
+              "value": "={{ $json.contactInfo.name }}"
+            },
+            {
+              "fieldName": "city",
+              "value": "={{ $json.contactInfo.city }}"
+            },
+            {
+              "fieldName": "country_id",
+              "value": "={{ $json.contactInfo.country_id }}"
+            },
+            {
+              "fieldName": "street",
+              "value": "={{ $json.contactInfo.street }}"
+            },
+            {
+              "fieldName": "zip",
+              "value": "={{ $json.contactInfo.zip }}"
+            }
+          ]
+        }
+      },
+      "id": "check-contact",
+      "name": "Check Contact Exists",
+      "type": "n8n-nodes-base.odoo",
+      "typeVersion": 1,
+      "position": [2000, 0],
+      "alwaysOutputData": true,
+      "credentials": {
+        "odooApi": {
+          "id": "eCEcpp3pBHncPgxX",
+          "name": "Comfort Stop Bot Odoo"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "conditions": [
+            {
+              "id": "contact-exists",
+              "leftValue": "={{ $json.id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "any",
+                "operation": "exists"
+              }
+            }
+          ]
+        }
+      },
+      "id": "contact-exists-check",
+      "name": "Contact Exists?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [2200, 0]
+    },
+    {
+      "parameters": {
+        "contactName": "={{ $node[\"Prepare Contact Data\"].json.contactInfo.name }}",
+        "additionalFields": {
+          "address": {
+            "value": {
+              "city": "={{ $node[\"Prepare Contact Data\"].json.contactInfo.city }}",
+              "country_id": "={{ $node[\"Prepare Contact Data\"].json.contactInfo.country_id }}",
+              "state_id": "={{ $node[\"Prepare Contact Data\"].json.contactInfo.state_id || '' }}",
+              "street": "={{ $node[\"Prepare Contact Data\"].json.contactInfo.street }}",
+              "street2": "={{ $node[\"Prepare Contact Data\"].json.contactInfo.street2 }}",
+              "zip": "={{ $node[\"Prepare Contact Data\"].json.contactInfo.zip }}"
+            }
+          },
+          "email": "={{ $node[\"Prepare Contact Data\"].json.contactInfo.email }}",
+          "phone": "={{ $node[\"Prepare Contact Data\"].json.contactInfo.phone }}"
+        }
+      },
+      "id": "create-contact",
+      "name": "Create Contact",
+      "type": "n8n-nodes-base.odoo",
+      "typeVersion": 1,
+      "position": [2400, 100],
+      "credentials": {
+        "odooApi": {
+          "id": "eCEcpp3pBHncPgxX",
+          "name": "Comfort Stop Bot Odoo"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "custom",
+        "customResource": "res.partner",
+        "operation": "update",
+        "customResourceId": "={{ $json.id }}",
+        "fieldsToCreateOrUpdate": {
+          "fields": [
+            {
+              "fieldName": "company_id",
+              "fieldValue": "5"
+            }
+          ]
+        }
+      },
+      "id": "update-company",
+      "name": "Update Company",
+      "type": "n8n-nodes-base.odoo",
+      "typeVersion": 1,
+      "position": [2600, 100],
+      "credentials": {
+        "odooApi": {
+          "id": "WPtuX4Fj0hjV3efr",
+          "name": "Chilly Water Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Collect all unique SKUs from order products\nconst orderData = $node[\"Prepare Contact Data\"].json.orderData;\nconst products = orderData.products || [];\n\n// Extract all SKUs from kit components\nconst allSKUs = new Set();\nproducts.forEach(product => {\n  if (product.routing_info && product.routing_info.length > 0) {\n    product.routing_info.forEach(routing => {\n      if (routing.kitComponents && routing.kitComponents.length > 0) {\n        routing.kitComponents.forEach(kit => {\n          if (kit.SKU) allSKUs.add(kit.SKU);\n        });\n      }\n    });\n  }\n});\n\nreturn {\n  json: {\n    skus: Array.from(allSKUs),\n    orderData,\n    contactId: $input.item.json.id\n  }\n};"
+      },
+      "id": "collect-skus",
+      "name": "Collect All SKUs",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2800, 0]
+    },
+    {
+      "parameters": {
+        "resource": "custom",
+        "customResource": "product.template",
+        "operation": "getAll",
+        "returnAll": true,
+        "options": {
+          "fieldsList": ["id", "default_code", "product_variant_id"]
+        },
+        "filterRequest": {
+          "filter": [
+            {
+              "fieldName": "default_code",
+              "operator": "in",
+              "value": "={{ $json.skus }}"
+            }
+          ]
+        }
+      },
+      "id": "batch-lookup-products",
+      "name": "Batch Lookup Products",
+      "type": "n8n-nodes-base.odoo",
+      "typeVersion": 1,
+      "position": [3000, 0],
+      "alwaysOutputData": true,
+      "credentials": {
+        "odooApi": {
+          "id": "eCEcpp3pBHncPgxX",
+          "name": "Comfort Stop Bot Odoo"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Build order lines efficiently\nconst orderData = $node[\"Collect All SKUs\"].json.orderData;\nconst contactId = $node[\"Collect All SKUs\"].json.contactId;\nconst products = orderData.products || [];\nconst productLookup = $input.all();\n\n// Create SKU to product_variant_id map\nconst skuMap = {};\nproductLookup.forEach(item => {\n  if (item.json.default_code && item.json.product_variant_id) {\n    const variantId = Array.isArray(item.json.product_variant_id) \n      ? item.json.product_variant_id[0] \n      : item.json.product_variant_id;\n    skuMap[item.json.default_code] = variantId;\n  }\n});\n\n// Build order lines\nconst orderLines = [];\nproducts.forEach(product => {\n  if (product.routing_info && product.routing_info.length > 0) {\n    product.routing_info.forEach(routing => {\n      if (routing.kitComponents && routing.kitComponents.length > 0) {\n        routing.kitComponents.forEach(kit => {\n          const productId = skuMap[kit.SKU];\n          if (productId) {\n            const qty = (product.quantity || 1) * (kit.componentQuantity || 1);\n            orderLines.push([0, 0, {\n              product_id: productId,\n              product_uom_qty: qty\n            }]);\n          }\n        });\n      }\n    });\n  }\n});\n\n// Filter out any invalid order lines\nconst validOrderLines = orderLines.filter(line => \n  line[2].product_id && line[2].product_uom_qty > 0\n);\n\nif (validOrderLines.length === 0) {\n  throw new Error('No valid order lines found for order');\n}\n\nreturn {\n  json: {\n    contactId,\n    orderLines: validOrderLines,\n    orderNumber: orderData.orderNumber,\n    shippingAddress: orderData.shippingAddress,\n    countryId: $node[\"Prepare Contact Data\"].json.contactInfo.country_id\n  }\n};"
+      },
+      "id": "build-order-lines",
+      "name": "Build Order Lines",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [3200, 0]
+    },
+    {
+      "parameters": {
+        "resource": "custom",
+        "customResource": "sale.order",
+        "fieldsToCreateOrUpdate": {
+          "fields": [
+            {
+              "fieldName": "partner_id",
+              "fieldValue": "={{ $json.contactId }}"
+            },
+            {
+              "fieldName": "pricelist_id",
+              "fieldValue": "1"
+            },
+            {
+              "fieldName": "order_line",
+              "fieldValue": "={{ $json.orderLines }}"
+            },
+            {
+              "fieldName": "origin",
+              "fieldValue": "={{ $json.orderNumber }}"
+            },
+            {
+              "fieldName": "state",
+              "fieldValue": "sale"
+            }
+          ]
+        }
+      },
+      "id": "create-order",
+      "name": "Create Sale Order",
+      "type": "n8n-nodes-base.odoo",
+      "typeVersion": 1,
+      "position": [3400, 0],
+      "credentials": {
+        "odooApi": {
+          "id": "eCEcpp3pBHncPgxX",
+          "name": "Comfort Stop Bot Odoo"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "custom",
+        "customResource": "sale.order",
+        "operation": "get",
+        "customResourceId": "={{ $json.id }}",
+        "options": {
+          "fieldsList": ["id", "name"]
+        }
+      },
+      "id": "get-sale-order",
+      "name": "Get Sale Order",
+      "type": "n8n-nodes-base.odoo",
+      "typeVersion": 1,
+      "position": [3600, 0],
+      "credentials": {
+        "odooApi": {
+          "id": "eCEcpp3pBHncPgxX",
+          "name": "Comfort Stop Bot Odoo"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "custom",
+        "customResource": "stock.picking",
+        "operation": "getAll",
+        "limit": 1,
+        "options": {
+          "fieldsList": ["id", "name"]
+        },
+        "filterRequest": {
+          "filter": [
+            {
+              "fieldName": "origin",
+              "value": "={{ $json.name }}"
+            }
+          ]
+        }
+      },
+      "id": "get-transfer",
+      "name": "Get Transfer",
+      "type": "n8n-nodes-base.odoo",
+      "typeVersion": 1,
+      "position": [3800, 0],
+      "credentials": {
+        "odooApi": {
+          "id": "eCEcpp3pBHncPgxX",
+          "name": "Comfort Stop Bot Odoo"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Determine carrier ID based on address\nconst shippingAddress = $node[\"Build Order Lines\"].json.shippingAddress;\nconst countryId = $node[\"Build Order Lines\"].json.countryId;\n\nconst addressLine1 = (shippingAddress.addressLine1 || '').toLowerCase();\nconst addressLine2 = (shippingAddress.addressLine2 || '').toLowerCase();\n\nconst poBoxPatterns = [\"po box\", \"p o box\", \"p.o. box\", \"p.o.box\", \"p o \", \"po \"];\nconst containsPoBox = poBoxPatterns.some(pattern => \n  addressLine1.includes(pattern) || addressLine2.includes(pattern)\n);\n\nlet carrierId;\nif (containsPoBox) {\n  carrierId = 8; // USPS for PO Box\n} else if (countryId !== 233) {\n  carrierId = 9; // International\n} else {\n  carrierId = 7; // Domestic\n}\n\nreturn {\n  json: {\n    pickingId: $input.item.json.id,\n    carrierId\n  }\n};"
+      },
+      "id": "calc-carrier",
+      "name": "Calculate Carrier ID",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [4000, 0]
+    },
+    {
+      "parameters": {
+        "resource": "custom",
+        "customResource": "stock.picking",
+        "operation": "update",
+        "customResourceId": "={{ $json.pickingId }}",
+        "fieldsToCreateOrUpdate": {
+          "fields": [
+            {
+              "fieldName": "carrier_id",
+              "fieldValue": "={{ $json.carrierId }}"
+            }
+          ]
+        }
+      },
+      "id": "set-carrier",
+      "name": "Set Carrier ID",
+      "type": "n8n-nodes-base.odoo",
+      "typeVersion": 1,
+      "position": [4200, 0],
+      "credentials": {
+        "odooApi": {
+          "id": "eCEcpp3pBHncPgxX",
+          "name": "Comfort Stop Bot Odoo"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Execute Workflow Trigger": {
+      "main": [[{"node": "Fetch Zentail Orders", "type": "main", "index": 0}]]
+    },
+    "When clicking \"Test workflow\"": {
+      "main": [[{"node": "Fetch Zentail Orders", "type": "main", "index": 0}]]
+    },
+    "Fetch Zentail Orders": {
+      "main": [[{"node": "Split Orders", "type": "main", "index": 0}]]
+    },
+    "Split Orders": {
+      "main": [[{"node": "Loop Over Orders", "type": "main", "index": 0}]]
+    },
+    "Loop Over Orders": {
+      "main": [
+        [],
+        [{"node": "Smart Lookup Prep", "type": "main", "index": 0}]
+      ]
+    },
+    "Smart Lookup Prep": {
+      "main": [[{"node": "Check Country Lookup", "type": "main", "index": 0}]]
+    },
+    "Check Country Lookup": {
+      "main": [
+        [{"node": "Lookup Country", "type": "main", "index": 0}],
+        [{"node": "Check State Lookup", "type": "main", "index": 0}]
+      ]
+    },
+    "Lookup Country": {
+      "main": [[{"node": "Merge Country Data", "type": "main", "index": 0}]]
+    },
+    "Merge Country Data": {
+      "main": [[{"node": "Check State Lookup", "type": "main", "index": 0}]]
+    },
+    "Check State Lookup": {
+      "main": [
+        [{"node": "Lookup State", "type": "main", "index": 0}],
+        [{"node": "Prepare Contact Data", "type": "main", "index": 0}]
+      ]
+    },
+    "Lookup State": {
+      "main": [[{"node": "Prepare Contact Data", "type": "main", "index": 0}]]
+    },
+    "Prepare Contact Data": {
+      "main": [[{"node": "Check Blacklist", "type": "main", "index": 0}]]
+    },
+    "Check Blacklist": {
+      "main": [
+        [{"node": "Prepare Cancellation", "type": "main", "index": 0}],
+        [{"node": "Check Contact Exists", "type": "main", "index": 0}]
+      ]
+    },
+    "Prepare Cancellation": {
+      "main": [[{"node": "Cancel Order in Zentail", "type": "main", "index": 0}]]
+    },
+    "Cancel Order in Zentail": {
+      "main": [[{"node": "Loop Over Orders", "type": "main", "index": 0}]]
+    },
+    "Check Contact Exists": {
+      "main": [[{"node": "Contact Exists?", "type": "main", "index": 0}]]
+    },
+    "Contact Exists?": {
+      "main": [
+        [{"node": "Collect All SKUs", "type": "main", "index": 0}],
+        [{"node": "Create Contact", "type": "main", "index": 0}]
+      ]
+    },
+    "Create Contact": {
+      "main": [[{"node": "Update Company", "type": "main", "index": 0}]]
+    },
+    "Update Company": {
+      "main": [[{"node": "Collect All SKUs", "type": "main", "index": 0}]]
+    },
+    "Collect All SKUs": {
+      "main": [[{"node": "Batch Lookup Products", "type": "main", "index": 0}]]
+    },
+    "Batch Lookup Products": {
+      "main": [[{"node": "Build Order Lines", "type": "main", "index": 0}]]
+    },
+    "Build Order Lines": {
+      "main": [[{"node": "Create Sale Order", "type": "main", "index": 0}]]
+    },
+    "Create Sale Order": {
+      "main": [[{"node": "Get Sale Order", "type": "main", "index": 0}]]
+    },
+    "Get Sale Order": {
+      "main": [[{"node": "Get Transfer", "type": "main", "index": 0}]]
+    },
+    "Get Transfer": {
+      "main": [[{"node": "Calculate Carrier ID", "type": "main", "index": 0}]]
+    },
+    "Calculate Carrier ID": {
+      "main": [[{"node": "Set Carrier ID", "type": "main", "index": 0}]]
+    },
+    "Set Carrier ID": {
+      "main": [[{"node": "Loop Over Orders", "type": "main", "index": 0}]]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "instanceId": "34dbf6be0a29da969eb7893451909930b59204e81a41cfb32c06ffd48cfb47fe"
+  }
+}
