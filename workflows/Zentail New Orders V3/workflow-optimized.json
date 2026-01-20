@@ -303,10 +303,10 @@
             {
               "id": "contact-exists",
               "leftValue": "={{ $json.id }}",
-              "rightValue": "",
+              "rightValue": "0",
               "operator": {
-                "type": "any",
-                "operation": "exists"
+                "type": "number",
+                "operation": "gt"
               }
             }
           ]
