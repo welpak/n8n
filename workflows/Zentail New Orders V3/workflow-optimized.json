@@ -77,13 +77,24 @@
     },
     {
       "parameters": {
-        "jsCode": "// Smart Location Lookup - Handles Country and State resolution in one node\nconst orderData = $json;\nconst shippingAddress = orderData.shippingAddress;\nconst countryCode = (shippingAddress.countryCode || '').toUpperCase();\nconst stateText = (shippingAddress.state || '').replace(/[.,;:!?]/g, '').trim();\n\n// Country code to ID mapping (most common countries)\nconst COUNTRY_MAP = {\n  'US': 233, 'CA': 40, 'MX': 156, 'GB': 231, 'AU': 14,\n  'DE': 59, 'FR': 76, 'IT': 112, 'ES': 68, 'NL': 165,\n  'BE': 20, 'CH': 214, 'AT': 15, 'SE': 210, 'NO': 167,\n  'DK': 59, 'FI': 73, 'IE': 106, 'NZ': 166, 'SG': 198,\n  'JP': 115, 'KR': 122, 'CN': 47, 'IN': 105, 'BR': 32,\n  'AR': 11, 'CL': 46, 'CO': 49, 'PE': 174\n};\n\n// Countries that don't use states\nconst NO_STATE_COUNTRIES = [181, 20, 224, 231, 75, 55, 43, 173, 88, 57, 240, 165, 91, 68, 227];\n\nconst countryId = COUNTRY_MAP[countryCode] || null;\nconst needsCountryLookup = !countryId;\nconst needsStateLookup = countryId && stateText.length > 0 && !NO_STATE_COUNTRIES.includes(countryId);\n\nreturn {\n  json: {\n    orderData,\n    countryCode,\n    stateText,\n    countryId,\n    stateId: null,\n    needsCountryLookup,\n    needsStateLookup\n  }\n};"
+        "options": {}
+      },
+      "id": "loop-orders",
+      "name": "Loop Over Orders",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [200, 400],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Smart Location Lookup - Handles Country and State resolution in one node\nconst orderData = $input.item.json;\nconst shippingAddress = orderData.shippingAddress;\nconst countryCode = (shippingAddress.countryCode || '').toUpperCase();\nconst stateText = (shippingAddress.state || '').replace(/[.,;:!?]/g, '').trim();\n\n// Country code to ID mapping (most common countries)\nconst COUNTRY_MAP = {\n  'US': 233, 'CA': 40, 'MX': 156, 'GB': 231, 'AU': 14,\n  'DE': 59, 'FR': 76, 'IT': 112, 'ES': 68, 'NL': 165,\n  'BE': 20, 'CH': 214, 'AT': 15, 'SE': 210, 'NO': 167,\n  'DK': 59, 'FI': 73, 'IE': 106, 'NZ': 166, 'SG': 198,\n  'JP': 115, 'KR': 122, 'CN': 47, 'IN': 105, 'BR': 32,\n  'AR': 11, 'CL': 46, 'CO': 49, 'PE': 174\n};\n\n// Countries that don't use states\nconst NO_STATE_COUNTRIES = [181, 20, 224, 231, 75, 55, 43, 173, 88, 57, 240, 165, 91, 68, 227];\n\nconst countryId = COUNTRY_MAP[countryCode] || null;\nconst needsCountryLookup = !countryId;\nconst needsStateLookup = countryId && stateText.length > 0 && !NO_STATE_COUNTRIES.includes(countryId);\n\nreturn {\n  json: {\n    orderData,\n    countryCode,\n    stateText,\n    countryId,\n    stateId: null,\n    needsCountryLookup,\n    needsStateLookup\n  }\n};"
       },
       "id": "smart-location-prep",
       "name": "Smart Location Prep",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [400, 400]
+      "position": [420, 400]
     },
     {
       "parameters": {
@@ -574,7 +585,13 @@
       "main": [[{"node": "Split Orders", "type": "main", "index": 0}]]
     },
     "Split Orders": {
-      "main": [[{"node": "Smart Location Prep", "type": "main", "index": 0}]]
+      "main": [[{"node": "Loop Over Orders", "type": "main", "index": 0}]]
+    },
+    "Loop Over Orders": {
+      "main": [
+        [],
+        [{"node": "Smart Location Prep", "type": "main", "index": 0}]
+      ]
     },
     "Smart Location Prep": {
       "main": [[{"node": "Lookup Country (if needed)", "type": "main", "index": 0}]]
@@ -601,7 +618,7 @@
       "main": [[{"node": "Cancel in Zentail", "type": "main", "index": 0}]]
     },
     "Cancel in Zentail": {
-      "main": [[]]
+      "main": [[{"node": "Loop Over Orders", "type": "main", "index": 0}]]
     },
     "Check Contact Exists": {
       "main": [[{"node": "Contact Exists?", "type": "main", "index": 0}]]
@@ -646,7 +663,7 @@
       "main": [[{"node": "Set Carrier ID", "type": "main", "index": 0}]]
     },
     "Set Carrier ID": {
-      "main": [[]]
+      "main": [[{"node": "Loop Over Orders", "type": "main", "index": 0}]]
     }
   },
   "pinData": {},
