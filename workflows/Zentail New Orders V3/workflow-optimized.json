@@ -34,10 +34,6 @@
             {
               "name": "warehouseId",
               "value": "8"
-            },
-            {
-              "name": "channelOrderIds",
-              "value": "={{ $json.channelOrderId }}"
             }
           ]
         },
