@@ -326,6 +326,43 @@
     },
     {
       "parameters": {
+        "resource": "custom",
+        "customResource": "res.partner",
+        "operation": "update",
+        "customResourceId": "={{ $json.contactId }}",
+        "fieldsToCreateOrUpdate": {
+          "fields": [
+            {
+              "fieldName": "company_id",
+              "fieldValue": "5"
+            }
+          ]
+        }
+      },
+      "id": "update-company-existing",
+      "name": "Update Company (Existing)",
+      "type": "n8n-nodes-base.odoo",
+      "typeVersion": 1,
+      "position": [2200, 500],
+      "credentials": {
+        "odooApi": {
+          "id": "WPtuX4Fj0hjV3efr",
+          "name": "Chilly Water Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Format existing contact data for next steps\nconst contactId = $node[\"Use Existing Contact\"].json.contactId;\nconst orderData = $node[\"Use Existing Contact\"].json.orderData;\n\n// Validate contact ID exists\nif (!contactId) {\n  throw new Error('Contact ID is missing from Use Existing Contact!');\n}\n\nreturn {\n  json: {\n    contactId,\n    orderData\n  }\n};"
+      },
+      "id": "format-existing-contact",
+      "name": "Format Existing Contact",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2400, 500]
+    },
+    {
+      "parameters": {
         "contactName": "={{ $node[\"Prepare Contact Data\"].json.contactInfo.name }}",
         "additionalFields": {
           "address": {
@@ -339,7 +376,8 @@
             }
           },
           "email": "={{ $node[\"Prepare Contact Data\"].json.contactInfo.email }}",
-          "phone": "={{ $node[\"Prepare Contact Data\"].json.contactInfo.phone }}"
+          "phone": "={{ $node[\"Prepare Contact Data\"].json.contactInfo.phone }}",
+          "companyId": "5"
         }
       },
       "id": "create-contact",
@@ -630,6 +668,12 @@
       ]
     },
     "Use Existing Contact": {
+      "main": [[{"node": "Update Company (Existing)", "type": "main", "index": 0}]]
+    },
+    "Update Company (Existing)": {
+      "main": [[{"node": "Format Existing Contact", "type": "main", "index": 0}]]
+    },
+    "Format Existing Contact": {
       "main": [[{"node": "Collect All SKUs", "type": "main", "index": 0}]]
     },
     "Create Contact": {
